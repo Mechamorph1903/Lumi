@@ -1,5 +1,5 @@
 // popup.js
-// This file controls everything you see in the popup panel.
+// This file controls everything you see in the popup panel. test
 // Its three jobs:
 //   1. Listen for button clicks from popup.html
 //   2. Ask content.js for text from the current webpage

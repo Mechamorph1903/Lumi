@@ -10,7 +10,7 @@
 //   background.js (the service worker) is the safe place for fetch() calls.
 //
 // It talks to popup.js using chrome.runtime.onMessage.addListener()
-
+//test
 
 // ─── LOAD API KEY FROM CONFIG ─────────────────────────────────────────────────
 // config.js is gitignored - each team member has their own copy locally

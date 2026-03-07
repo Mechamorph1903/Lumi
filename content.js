@@ -16,7 +16,7 @@
 // ─── LISTEN FOR MESSAGES FROM POPUP.JS ───────────────────────────────────────
 // popup.js will send a message asking for text
 // This listener waits for that message and sends back what was asked for
-
+//test
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // ── REQUEST: GET FULL PAGE TEXT ──
