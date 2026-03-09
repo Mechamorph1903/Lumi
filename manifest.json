@@ -4,20 +4,16 @@
   "version": "1.0",
   "description": "AI-powered screen reader that summarizes any webpage and reads it aloud",
 
-  // This is the brain of the extension - it runs in the background silently
-  // It's allowed to make external API calls (like to Claude)
+ 
   "background": {
     "service_worker": "background.js"
   },
 
-  // This is the face - what appears when you click the extension icon
   "action": {
     "default_popup": "popup.html",
     "default_icon": "icon.png"
   },
 
-  // content.js gets injected into every webpage the user visits
-  // It's the only file that can touch/read the actual page content
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
@@ -25,16 +21,9 @@
     }
   ],
 
-  // Permissions - Chrome will ask the user to allow these on install
   "permissions": [
-    "activeTab",        // lets us access the current tab
-    "scripting",        // lets us inject content.js into pages
-    "storage"           // lets us save small things like user preferences
   ],
 
-  // External URLs this extension is allowed to talk to
   "host_permissions": [
-    "https://api.anthropic.com/*"
   ]
 }
-//test

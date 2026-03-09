@@ -25,6 +25,7 @@ const statusText        = document.getElementById("status-text")
 // Call this whenever the state changes so the user knows what's happening
 
 function setStatus(message) {
+    statusText.textContent = message
   // TODO: update statusText.textContent with the message
   // Example states to handle: "Ready", "Thinking...", "Reading...", "Done", "Error"
 }
@@ -38,7 +39,34 @@ function setStatus(message) {
 //   4. Pass the summary to speak()
 
 btnSummarizePage.addEventListener("click", async () => {
-  // TODO
+  setStatus("Reading page...")
+
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+
+  if (!tab || !tab.id) {
+    setStatus("No active tab found.")
+    return
+  }
+
+  chrome.tabs.sendMessage(
+    tab.id,
+    { type: "GET_PAGE_TEXT" },
+    (response) => {
+      if (chrome.runtime.lastError) {
+        console.error("GET_PAGE_TEXT error:", chrome.runtime.lastError.message)
+        setStatus("Cannot read this page.")
+        return
+      }
+
+      if (!response || !response.text) {
+        setStatus("No page text found.")
+        return
+      }
+
+      console.log("PAGE TEXT:", response.text.substring(0, 200))
+      setStatus("Page text captured. Ready for summary.")
+    }
+  )
 })
 
 
@@ -50,7 +78,34 @@ btnSummarizePage.addEventListener("click", async () => {
 //   4. Pass the summary to speak()
 
 btnReadSelection.addEventListener("click", async () => {
-  // TODO
+  setStatus("Reading selection...")
+
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+
+  if (!tab || !tab.id) {
+    setStatus("No active tab found.")
+    return
+  }
+
+  chrome.tabs.sendMessage(
+    tab.id,
+    { type: "GET_SELECTED_TEXT" },
+    (response) => {
+      if (chrome.runtime.lastError) {
+        console.error("GET_SELECTED_TEXT error:", chrome.runtime.lastError.message)
+        setStatus("Cannot read this page.")
+        return
+      }
+
+      if (!response || !response.text || !response.text.trim()) {
+        setStatus("No text selected.")
+        return
+      }
+
+      console.log("SELECTED TEXT:", response.text)
+      setStatus("Selection captured.")
+    }
+  )
 })
 
 

@@ -24,7 +24,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // TODO: grab all visible text from the page
     // Hint: document.body.innerText gives you everything
     // Tip: trim it and maybe limit the length so Claude isn't overwhelmed
-    const pageText = "" // replace this
+    const pageText = document.body.innerText // replace this
     sendResponse({ text: pageText })
   }
 
@@ -32,7 +32,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "GET_SELECTED_TEXT") {
     // TODO: grab only what the user has highlighted
     // Hint: window.getSelection().toString() is all you need
-    const selectedText = "" // replace this
+    const selectedText = window.getSelection().toString() // replace this
     sendResponse({ text: selectedText })
   }
 
