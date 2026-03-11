@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Lazey",
+  "name": "Access AI",
   "version": "1.0",
   "description": "AI-powered screen reader that summarizes any webpage and reads it aloud",
 
@@ -10,7 +10,7 @@
 
   "action": {
     "default_popup": "popup.html",
-    "default_icon": "extension-pic.png"
+    "default_icon": "icon.png"
   },
 
   

@@ -27,6 +27,11 @@
       <!-- These buttons trigger the two main features -->
       <!-- The actual click logic lives in popup.js, not here -->
 
+      <textarea 
+        id="user-prompt" 
+         placeholder="Tell Access AI What to Focus On"
+      ></textarea>
+
       <button id="btn-summarize-page">
         Summarize Full Page
       </button>
@@ -67,6 +72,12 @@
         </div>
 
       </div>
+
+      <button id="toggle-summary">Show Summary</button>
+        <div id="summary-container" class="hidden">
+          <h3>Summary</h3>
+          <p id="summary-text"></p>
+        </div>
 
     </main>
 
