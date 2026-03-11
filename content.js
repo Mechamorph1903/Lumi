@@ -1,3 +1,4 @@
+console.log("CONTENT SCRIPT LOADED")
 // content.js
 // This file is injected into every webpage the user visits.
 // It is the ONLY file that can directly touch and read webpage content.
@@ -37,19 +38,102 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 })
 
 
-// ─── OPTIONAL: FLOATING TOOLTIP ──────────────────────────────────────────────
-// When the user highlights text, a small button appears near their selection
-// Clicking it triggers the "Read Selection" flow without opening the popup
-//
-// This is a nice-to-have feature - build the core first, add this after
-//
-// To build this you'll need to:
-//   1. Listen for the "mouseup" event on the document
-//   2. Check if window.getSelection().toString() is not empty
-//   3. Inject a small <div> button near the selection coordinates
-//   4. On click, send a message to background.js with the selected text
-//   5. Remove the tooltip when the user clicks elsewhere
+// FLOATING "READ THIS" BUTTON
+// Appears when the user highlights text anywhere on a webpage.
+// Allows the user to trigger the AI summary + speech pipeline
+// without opening the extension popup.
 
-// document.addEventListener("mouseup", () => {
-//   TODO
-// })
+// Stores reference to the currently visible floating button
+let floatingButton = null
+
+// Listen for when the user finishes highlighting text
+document.addEventListener("mouseup", (event) => {
+
+  console.log("Mouse released on page")
+
+  // Prevent the tooltip logic from triggering when the user
+  // clicks the floating button itself
+  if (floatingButton && event.target === floatingButton) {
+    return
+  }
+
+  // Get the text the user currently has selected
+  const selectedText = window.getSelection().toString().trim()
+
+  // If no text is selected, remove any existing button
+  if (!selectedText) {
+    if (floatingButton) {
+      floatingButton.remove()
+      floatingButton = null
+    }
+    return
+  }
+
+  // Determine where on the page the text selection is located
+  // so we can position the button nearby
+  const selection = window.getSelection()
+  const range = selection.getRangeAt(0)
+  const rect = range.getBoundingClientRect()
+
+  // Remove any previous floating button before creating a new one
+  if (floatingButton) {
+    floatingButton.remove()
+  }
+
+  //CREATE THE FLOATING BUTTON 
+  console.log("Floating button created")
+
+  floatingButton = document.createElement("button")
+  floatingButton.textContent = "🔊 Read this"
+
+  // Position the button near the highlighted text
+  floatingButton.style.position = "absolute"
+  floatingButton.style.top = `${window.scrollY + rect.top - 40}px`
+  floatingButton.style.left = `${window.scrollX + rect.left}px`
+  floatingButton.style.zIndex = "9999"
+
+  // Basic styling to match extension theme
+  floatingButton.style.padding = "6px 10px"
+  floatingButton.style.fontSize = "12px"
+  floatingButton.style.borderRadius = "6px"
+  floatingButton.style.border = "none"
+  floatingButton.style.background = "#2d7ff9"
+  floatingButton.style.color = "white"
+  floatingButton.style.cursor = "pointer"
+
+  // When clicked, send the selected text to the AI pipeline
+  floatingButton.addEventListener("click", () => {
+
+    console.log("Floating Read button clicked")
+    console.log("Selected text:", selectedText)
+
+    // Send highlighted text to background.js for AI summarization
+    console.log("Sending text to background")
+
+    chrome.runtime.sendMessage({
+      type: "GET_SUMMARY",
+      text: selectedText
+    }, (aiResponse) => {
+
+      // If AI fails or returns nothing, exit safely
+      if (!aiResponse || !aiResponse.summary) return
+
+      // Send the summary to the speech system
+      chrome.runtime.sendMessage({
+        type: "PLAY_SPEECH",
+        text: aiResponse.summary
+      })
+
+    })
+
+    // Remove the floating button after it is used
+    floatingButton.remove()
+    floatingButton = null
+  })
+
+  // Add the button to the page
+  // Using documentElement instead of body avoids conflicts
+  // with certain website layouts or frameworks
+  document.documentElement.appendChild(floatingButton)
+
+})

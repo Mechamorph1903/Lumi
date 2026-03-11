@@ -19,12 +19,12 @@
 body {
   width: 320px;         /* Chrome popup fixed width */
   min-height: 200px;
-  font-family: sans-serif;
+  font-family: Arial, Helvetica, sans-serif;
   font-size: 14px;
 
   /* TODO: choose your color scheme */
-  background-color: ;
-  color: ;
+  background-color: #111;
+  color: #f5f5f5 ;
   padding: 16px;
 }
 
@@ -33,11 +33,14 @@ body {
 
 header {
   margin-bottom: 16px;
+  text-align: center;
   /* TODO: style the AccessAI title and subtitle */
 }
 
 header h1 {
   font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 2px;
   /* TODO */
 }
 
@@ -62,16 +65,21 @@ button {
   font-size: 14px;
   font-weight: bold;
 
+  background-color: #2d7ff9;
+  color: white;
+
+  transition: background-color 0.2s ease;
   /* TODO: background and text colors */
 }
 
 button:hover {
+    background-color: #1a66d9;
   /* TODO: slightly lighter or darker on hover */
 }
 
 button:focus {
   /* TODO: visible focus ring - never remove focus outlines for accessibility */
-  outline: 2px solid ;
+    outline: 2px solid #ffd54f;
 }
 
 
@@ -81,34 +89,39 @@ button:focus {
   text-align: center;
   margin: 12px 0;
   font-size: 13px;
+  color: #bbbbbb;
+  font-style: italic;
   /* TODO: subtle color, maybe italic */
 }
 
 
 /* ── AUDIO CONTROLS ───────────────────────────────────────────────────────── */
 
+
 #audio-controls {
   margin-top: 12px;
-  /* TODO: consider hiding this section until speech is active */
-  /* Hint: toggle a CSS class with JS rather than using display:none directly */
 }
 
-#audio-controls button {
-  width: 48%;
-  display: inline-block;
-  /* TODO: make pause and stop sit side by side */
+/* Pause + Stop row */
+#speech-buttons {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
 }
 
-/* Speed slider */
-label[for="speed-slider"] {
+#speech-buttons button {
+  flex: 1;
+}
+
+/* Speed section */
+#speed-control label {
   display: block;
-  margin-top: 10px;
   font-size: 12px;
-  /* TODO */
+  color: #aaaaaa;
 }
 
 #speed-slider {
   width: 100%;
   margin-top: 4px;
-  /* TODO: style the range input - browsers render these differently */
+  cursor: pointer;
 }

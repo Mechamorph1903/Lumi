@@ -98,6 +98,9 @@ btnSummarizePage.addEventListener("click", async () => {
 //   3. Get the summary back
 //   4. Pass the summary to speak()
 
+
+//Flow is identical to Summarize Page,
+//except content.js returns only highlighted text.
 btnReadSelection.addEventListener("click", async () => {
   // TODO
   setStatus("Reading...")
@@ -114,16 +117,35 @@ btnReadSelection.addEventListener("click", async () => {
 // ─── BUTTON: PAUSE / RESUME ───────────────────────────────────────────────────
 // Toggle between pausing and resuming the speech
 
+// SPEECH CONTROLS
+//
+// popup.js does NOT implement speech itself.
+// It simply sends commands to background.js.
+
+
+// This button currently sends PAUSE_SPEECH only.
+// If resume  is added later, this logic will need to be
+// updated to toggle between pause and resume based on speech state.
+//background.js handles speech playback
 btnPause.addEventListener("click", () => {
-  // TODO
+  setStatus("Speech paused.")
+
+  chrome.runtime.sendMessage({
+    type: "PAUSE_SPEECH"
+  })
 })
 
 
 // ─── BUTTON: STOP ────────────────────────────────────────────────────────────
 // Stop reading entirely and reset
 
+
 btnStop.addEventListener("click", () => {
-  // TODO
+  setStatus("Speech stopped.")
+
+  chrome.runtime.sendMessage({
+    type: "STOP_SPEECH"
+  })
 })
 
 
@@ -131,7 +153,10 @@ btnStop.addEventListener("click", () => {
 // When the user moves the slider, update the speech rate
 
 speedSlider.addEventListener("input", () => {
-  // TODO: pass speedSlider.value to the speak() function
+  chrome.runtime.sendMessage({
+    type: "SET_SPEED",
+    rate: Number(speedSlider.value)
+  })
 })
 
 
