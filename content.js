@@ -14,31 +14,194 @@ console.log("CONTENT SCRIPT LOADED")
 // It talks to popup.js using chrome.runtime.onMessage / sendMessage
 
 
-// ─── LISTEN FOR MESSAGES FROM POPUP.JS ───────────────────────────────────────
-// popup.js will send a message asking for text
-// This listener waits for that message and sends back what was asked for
-//test
+// ─── MINI SUMMARY PANEL (injected onto the page) ────────────────────────────
+// Creates or updates a small floating panel at the bottom-right of the viewport
+// so the user can always see & re-read the summary even if the popup closes.
+
+let summaryPanel = null
+
+function showSummaryPanel(text) {
+  if (!summaryPanel) {
+    summaryPanel = document.createElement("div")
+    summaryPanel.id = "accessai-summary-panel"
+
+    // Fixed overlay styling
+    Object.assign(summaryPanel.style, {
+      position: "fixed",
+      bottom: "16px",
+      right: "16px",
+      width: "340px",
+      maxHeight: "260px",
+      background: "#1a1a2e",
+      color: "#e0e0e0",
+      fontFamily: "Arial, Helvetica, sans-serif",
+      fontSize: "13px",
+      lineHeight: "1.6",
+      borderRadius: "10px",
+      boxShadow: "0 4px 24px rgba(0,0,0,0.5)",
+      zIndex: "2147483647",
+      display: "flex",
+      flexDirection: "column",
+      overflow: "hidden",
+      border: "1px solid #333"
+    })
+
+    // Header bar with title + close button
+    const header = document.createElement("div")
+    Object.assign(header.style, {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: "8px 12px",
+      background: "#2d7ff9",
+      color: "white",
+      fontSize: "13px",
+      fontWeight: "bold",
+      flexShrink: "0"
+    })
+    header.textContent = "AccessAI Summary"
+
+    const closeBtn = document.createElement("button")
+    closeBtn.textContent = "X"
+    Object.assign(closeBtn.style, {
+      background: "transparent",
+      border: "none",
+      color: "white",
+      fontSize: "14px",
+      cursor: "pointer",
+      padding: "0 2px",
+      fontWeight: "bold"
+    })
+    closeBtn.addEventListener("click", () => {
+      summaryPanel.remove()
+      summaryPanel = null
+    })
+    header.appendChild(closeBtn)
+
+    // Scrollable text body
+    const body = document.createElement("div")
+    body.id = "accessai-summary-body"
+    Object.assign(body.style, {
+      padding: "10px 12px",
+      overflowY: "auto",
+      flex: "1",
+      whiteSpace: "pre-wrap"
+    })
+
+    summaryPanel.appendChild(header)
+    summaryPanel.appendChild(body)
+    document.documentElement.appendChild(summaryPanel)
+  }
+
+  // Update content
+  const body = summaryPanel.querySelector("#accessai-summary-body")
+  body.textContent = text
+}
+
+// ─── TEXT-TO-SPEECH SYSTEM ────────────────────────────────────────────────────
+// Web Speech API is built into Chrome - no API key or install needed.
+// This is the only context (page/content script) where it is available.
+
+let currentRate = 1  // tracks speed set by slider; updated by SET_SPEED messages
+
+// Voices load asynchronously — cache them once they're ready
+let cachedVoices = []
+function loadVoices() {
+  cachedVoices = window.speechSynthesis.getVoices()
+}
+loadVoices()
+window.speechSynthesis.addEventListener("voiceschanged", loadVoices)
+
+function getBestVoice() {
+  const voices = cachedVoices.length ? cachedVoices : window.speechSynthesis.getVoices()
+  return (
+    voices.find(v => v.lang.startsWith("en") && v.localService) ||
+    voices.find(v => v.lang.startsWith("en")) ||
+    voices[0] ||
+    null
+  )
+}
+
+function speak(text, rate = currentRate) {
+  // Save text so SET_SPEED can restart speech if needed
+  window._lastUtteranceText = text
+
+  // Cancel anything already playing so we start fresh
+  window.speechSynthesis.cancel()
+
+  // Firefox ignores speak() called immediately after cancel().
+  // A brief delay lets the engine reset before queuing new speech.
+  setTimeout(() => {
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.rate = rate
+
+    // Pick the most natural-sounding English voice available in the browser.
+    // Prefer local (offline) voices first, then any English voice, then whatever is available.
+    const voice = getBestVoice()
+    if (voice) utterance.voice = voice
+
+    utterance.onerror = (e) => console.error("Speech error:", e.error)
+
+    window.speechSynthesis.speak(utterance)
+  }, 50)
+}
+
+function pauseSpeech() {
+  // Toggle: pause if speaking, resume if already paused
+  if (window.speechSynthesis.paused) {
+    window.speechSynthesis.resume()
+  } else if (window.speechSynthesis.speaking) {
+    window.speechSynthesis.pause()
+  }
+}
+
+function stopSpeech() {
+  window.speechSynthesis.cancel()
+}
+
+
+// ─── LISTEN FOR MESSAGES FROM POPUP.JS / BACKGROUND.JS ───────────────────────
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // ── REQUEST: GET FULL PAGE TEXT ──
   if (message.type === "GET_PAGE_TEXT") {
-    // TODO: grab all visible text from the page
-    // Hint: document.body.innerText gives you everything
-    // Tip: trim it and maybe limit the length so Claude isn't overwhelmed
-    const pageText = document.body.innerText // replace this
+    const pageText = document.body.innerText.trim().slice(0, 15000)
     sendResponse({ text: pageText })
   }
 
   // ── REQUEST: GET SELECTED TEXT ──
   if (message.type === "GET_SELECTED_TEXT") {
-    // TODO: grab only what the user has highlighted
-    // Hint: window.getSelection().toString() is all you need
-    const selectedText = window.getSelection().toString() // replace this
+    const selectedText = window.getSelection().toString()
     sendResponse({ text: selectedText })
   }
 
-  // IMPORTANT: return true here to tell Chrome this is async
-  // Without this line, sendResponse won't work
+  // ── SPEECH COMMANDS (forwarded here from background.js) ──
+  if (message.type === "PLAY_SPEECH") {
+    showSummaryPanel(message.text)
+    speak(message.text)
+    sendResponse({ ok: true })
+  }
+
+  if (message.type === "PAUSE_SPEECH") {
+    pauseSpeech()
+    sendResponse({ ok: true })
+  }
+
+  if (message.type === "STOP_SPEECH") {
+    stopSpeech()
+    sendResponse({ ok: true })
+  }
+
+  if (message.type === "SET_SPEED") {
+    currentRate = message.rate
+    // If speech is active, restart it at the new speed
+    if (window.speechSynthesis.speaking) {
+      const remaining = window._lastUtteranceText
+      if (remaining) speak(remaining, currentRate)
+    }
+    sendResponse({ ok: true })
+  }
+
   return true
 })
 
@@ -123,11 +286,9 @@ document.addEventListener("mouseup", (event) => {
       // If AI fails or returns nothing, exit safely
       if (!aiResponse || !aiResponse.summary) return
 
-      // Send the summary to the speech system
-      chrome.runtime.sendMessage({
-        type: "PLAY_SPEECH",
-        text: aiResponse.summary
-      })
+      // Show summary panel on the page and read aloud
+      showSummaryPanel(aiResponse.summary)
+      speak(aiResponse.summary)
 
     })
 

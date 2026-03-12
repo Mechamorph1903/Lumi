@@ -51,6 +51,30 @@ header p {
 }
 
 
+/* ── CUSTOM PROMPT INPUT ──────────────────────────────────────────────────── */
+
+#user-prompt {
+  width: 100%;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  border: 1px solid #333;
+  border-radius: 6px;
+  background-color: #1e1e1e;
+  color: #e0e0e0;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+#user-prompt::placeholder {
+  color: #777;
+}
+
+#user-prompt:focus {
+  outline: 2px solid #ffd54f;
+  border-color: transparent;
+}
+
+
 /* ── BUTTONS ──────────────────────────────────────────────────────────────── */
 /* All buttons should have strong contrast and clear focus states              */
 /* Focus states are especially important for keyboard and screen reader users  */
@@ -92,6 +116,26 @@ button:focus {
   color: #bbbbbb;
   font-style: italic;
   /* TODO: subtle color, maybe italic */
+}
+
+
+/* ── SUMMARY BOX ──────────────────────────────────────────────────────────── */
+
+#summary-box {
+  background-color: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 12px;
+  margin: 10px 0;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+#summary-text {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #e0e0e0;
+  white-space: pre-wrap;
 }
 
 

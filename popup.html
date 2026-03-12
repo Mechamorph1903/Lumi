@@ -23,6 +23,13 @@
 
     <main>
 
+      <!-- CUSTOM PROMPT (optional) -->
+      <input
+        type="text"
+        id="user-prompt"
+        placeholder="Custom instruction (optional)"
+      />
+
       <!-- PRIMARY ACTIONS -->
       <!-- These buttons trigger the two main features -->
       <!-- The actual click logic lives in popup.js, not here -->
@@ -42,6 +49,11 @@
 
       <p id="status-text">Ready</p>
 
+      <!-- SUMMARY BOX -->
+      <!-- Hidden until a summary is ready; populated by popup.js -->
+      <div id="summary-box" hidden>
+        <p id="summary-text"></p>
+      </div>
 
       <!-- AUDIO CONTROLS -->
       <!-- These control the Web Speech API playback -->
