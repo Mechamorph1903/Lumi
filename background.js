@@ -49,7 +49,8 @@ async function getSummary(text, userPrompt = "") {
   headers: {
     "x-api-key": apiKey,
     "anthropic-version": "2023-06-01",
-    "content-type": "application/json"
+    "content-type": "application/json",
+    "anthropic-dangerous-direct-browser-access": "true"   
   },
   body: JSON.stringify({
     model: "claude-haiku-4-5-20251001",
@@ -64,12 +65,10 @@ async function getSummary(text, userPrompt = "") {
 
 })
 	let data = await response.json();
+  console.log("Raw API response:", JSON.stringify(data))  // add this line
 	const result = data.content?.[0]?.text ?? "No Summary Provided";
 	return result;
 }
-
-const data = await getSummary("");
-console.log(data);
 
 
 // ─── THE SPEAK FUNCTION: READ TEXT ALOUD ─────────────────────────────────────
@@ -102,8 +101,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   //receives message of text to summarize, calls the getSummary function which is async
   //so returns promise object, this is worked around by using .then() which waits for a 
   //value then performs another action 
+  console.log(`got message: ${message}`)
   if (message.type === "GET_SUMMARY") {
+    console.log("calling getSummary with:", message.text)
     getSummary(message.text, message.prompt).then((response) => {
+      console.log("summary ready:", response)
       sendResponse({ summary: response });
     });
   }

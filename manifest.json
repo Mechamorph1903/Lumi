@@ -5,7 +5,8 @@
   "description": "AI-powered screen reader that summarizes any webpage and reads it aloud",
 
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
 
   "action": {

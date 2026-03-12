@@ -45,21 +45,31 @@ const getPageText = (id) => {
   })
 }
 const getSelectedText = (id) => {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     chrome.tabs.sendMessage(
       id,
       {type: "GET_SELECTED_TEXT"},
       (response) => {
+        if (chrome.runtime.lastError) {
+          reject(chrome.runtime.lastError.message)
+          return
+        }
+        if (!response) {
+          reject("No response from content.js - is this a valid webpage?")
+          return
+        }
+        console.log("got selection:" + response.text);
         resolve(response.text);
       }
     )
   })
 }
-const getSummaryFromBackground = (summaryText, userPrompt) => {
+const getSummaryFromBackground = (summaryText, userPrompt="what is this sayin") => {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage(
       {type: "GET_SUMMARY", text: summaryText, prompt: userPrompt},
       (response) => {
+        console.log("got summary: " + response.summary);
         resolve(response.summary);
       }
     )
@@ -81,10 +91,11 @@ btnSummarizePage.addEventListener("click", async () => {
   const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
   const pageText = await getPageText(tab.id);
   const summary = await getSummaryFromBackground(pageText, userPrompt);
+  console.log(summary)
   setStatus("Summary Ready.")
-  setTimeout(setStatus("Reading..."), 2000);
-  speak(summary);
-  summaryBox.textContent = summary;
+  // setTimeout(setStatus("Reading..."), 2000);
+  // speak(summary);
+  // summaryBox.textContent = summary;
   
 
 
@@ -108,9 +119,9 @@ btnReadSelection.addEventListener("click", async () => {
   const pageText = await getSelectedText(tab.id);
   const summary = await getSummaryFromBackground(pageText, userPrompt);
   setStatus("Summary Ready.")
-  setTimeout(setStatus("Reading..."), 2000);
-  speak(summary);
-  summaryBox.textContent = summary;
+  // setTimeout(setStatus("Reading..."), 2000);
+  // speak(summary);
+  // summaryBox.textContent = summary;
 })
 
 
