@@ -6,7 +6,7 @@ An AI-powered browser extension that summarizes webpage content and reads it alo
 
 ## What It Does
 
-AccessAI is a Chrome extension that makes web content more accessible by:
+AccessAI is a browser extension (Chrome + Firefox) that makes web content more accessible by:
 
 - **Summarizing full pages** — extracts all visible text and generates a concise 3–5 sentence summary using Claude AI
 - **Summarizing selections** — highlight any text on a page and summarize just that
@@ -17,7 +17,7 @@ AccessAI is a Chrome extension that makes web content more accessible by:
 
 ## Prerequisites
 
-- Google Chrome browser
+- Google Chrome or Mozilla Firefox
 - An [Anthropic API key](https://console.anthropic.com/)
 
 ---
@@ -44,13 +44,18 @@ export default CONFIG;
 
 > **Note:** `config.js` is gitignored and must be created manually. Never commit your API key.
 
-### 3. Load the extension in Chrome
+### 3. Load the extension
 
-1. Open Chrome and navigate to `chrome://extensions/`
+**Chrome:**
+1. Open `chrome://extensions/`
 2. Toggle on **Developer mode** (top-right corner)
 3. Click **Load unpacked**
 4. Select the `humane-glmg` project folder
-5. The AccessAI extension will appear in your toolbar
+
+**Firefox:**
+1. Open `about:debugging#/runtime/this-firefox`
+2. Click **Load Temporary Add-on...**
+3. Select `manifest.json` from the project folder
 
 ---
 
@@ -87,9 +92,9 @@ Use the controls in the extension popup to:
 
 ```
 humane-glmg/
-├── manifest.json     # Chrome extension config (Manifest V3)
-├── background.js     # Service worker — handles Claude API calls & speech
-├── content.js        # Injected into pages — extracts text, floating button
+├── manifest.json     # Extension config (Manifest V3, Chrome + Firefox)
+├── background.js     # Service worker — calls Claude API, forwards speech commands
+├── content.js        # Injected into pages — extracts text, runs TTS, floating button
 ├── popup.html        # Extension popup UI
 ├── popup.js          # Popup event handlers and message coordination
 ├── popup.css         # Dark-theme styling
@@ -104,13 +109,14 @@ humane-glmg/
 2. `popup.js` sends a message to `content.js` to extract page or selection text
 3. `popup.js` forwards the text to `background.js`
 4. `background.js` calls the Anthropic Claude API (`claude-haiku-4-5-20251001`) to generate a summary
-5. The summary is read aloud using the browser's Web Speech API
+5. `background.js` forwards the summary to `content.js`
+6. `content.js` reads it aloud using the browser's Web Speech API (service workers can't access `speechSynthesis`)
 
 ---
 
 ## Permissions
 
-The extension requires the following Chrome permissions:
+The extension requires the following permissions:
 
 | Permission | Reason |
 |------------|--------|
@@ -123,6 +129,6 @@ The extension requires the following Chrome permissions:
 ## Tech Stack
 
 - Vanilla JavaScript (no build step required)
-- Chrome Extensions Manifest V3
+- Extensions Manifest V3 (Chrome + Firefox)
 - Anthropic Claude API (`claude-haiku-4-5-20251001`)
 - Web Speech API (browser-native text-to-speech)

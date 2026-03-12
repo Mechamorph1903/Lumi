@@ -27,6 +27,9 @@ if (!CONFIG || !CONFIG.apiKey) {
 // Called when popup.js sends: { type: "GET_SUMMARY", text: "..." }
 
 async function getSummary(text, userPrompt = "") {
+  if (!CONFIG || !CONFIG.apiKey) {
+    throw new Error("Missing API key. Create config.js with your Anthropic key.")
+  }
 
   const baseInstruction = userPrompt
     ? userPrompt
