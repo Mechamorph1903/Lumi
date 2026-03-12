@@ -27,7 +27,6 @@ const summaryBox        = document.getElementById("summary-box")
 // Call this whenever the state changes so the user knows what's happening
 
 function setStatus(message) {
-  // Example states to handle: "Ready", "Thinking...", "Reading...", "Done", "Error"
   statusText.textContent =  message;
   return
 }
@@ -64,7 +63,7 @@ const getSelectedText = (id) => {
     )
   })
 }
-const getSummaryFromBackground = (summaryText, userPrompt="what is this sayin") => {
+const getSummaryFromBackground = (summaryText, userPrompt, mode) => {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage(
       {type: "GET_SUMMARY", text: summaryText, prompt: userPrompt},
@@ -90,7 +89,7 @@ btnSummarizePage.addEventListener("click", async () => {
   setStatus("Reading...")
   const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
   const pageText = await getPageText(tab.id);
-  const summary = await getSummaryFromBackground(pageText, userPrompt);
+  const summary = await getSummaryFromBackground(pageText, userPrompt, "page");
   console.log(summary)
   setStatus("Summary Ready.")
   // setTimeout(setStatus("Reading..."), 2000);
@@ -117,7 +116,7 @@ btnReadSelection.addEventListener("click", async () => {
   setStatus("Reading...")
   const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
   const pageText = await getSelectedText(tab.id);
-  const summary = await getSummaryFromBackground(pageText, userPrompt);
+  const summary = await getSummaryFromBackground(pageText, userPrompt, "selection");
   setStatus("Summary Ready.")
   // setTimeout(setStatus("Reading..."), 2000);
   // speak(summary);

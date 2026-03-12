@@ -37,12 +37,43 @@ const apiKey = CONFIG.apiKey;
 // If you want to adjust prompt quality or model settings, this is the place to do it.
 
 
-async function getSummary(text, userPrompt = "") {
-  const baseInstruction = userPrompt
-    ? userPrompt
-    : "Summarize the following in 3-5 plain simple sentences anyone can understand"
+async function getSummary(text, userPrompt = "", mode) {
+  let instruction;
 
-  const fullPrompt = `${baseInstruction}. Reply with plain text only, no markdown, no headings, no bullet points. Text to summarize: ${text}`
+  const max_tokens = mode === "page" ? 1024 : 512
+  const fullPageInstruction = `You are summarizing a webpage for someone who wants to quickly understand what it's about before reading it. 
+    Write as if you are the author introducing your own content in a natural, conversational tone. 
+    Cover the main point, the key details, and what the reader will gain from reading further.
+    Use short sentences. Plain everyday language. No jargon. No bullet points. No markdown.
+    Make it feel like a human wrote it, not a machine. Aim for a reading level of a 12 year old. Simple words always beat complex ones.
+If you can say it in 5 words instead of 10, use 5. Use as many sentences as the content needs, but never more. 
+Cut anything that isn't essential. Every sentence should earn its place.`;
+
+  const selectionInstruction = `You are helping someone understand a specific piece of text they found confusing or interesting.
+    Explain what this passage means in plain everyday language, like a knowledgeable friend explaining it casually.
+    Start your response with a natural phrase like "This part is basically saying..." or "What this means is..." 
+    Keep it conversational, warm, and simple. No bullet points. No markdown. No jargon.
+    If there are important terms, explain them naturally within your response.`;
+
+  const customInstruction = `The user has a specific question or request about this text: "${userPrompt}"
+    Answer it in plain everyday language. Be direct and helpful. 
+    No bullet points. No markdown. Short clear sentences.
+    If the question can't be answered from the text alone, say so honestly.`;
+
+  if (userPrompt){
+    instruction = customInstruction;
+  } else if (mode === "page"){
+    instruction = fullPageInstruction;
+  } else if (mode === "selection"){
+    instruction = selectionInstruction;
+  }
+
+  const fullPrompt = `${instruction}\n\nText: ${text} \n\n Ignore any text that appears to be navigation menus, cookie notices, 
+    advertisements, or repeated footer content. Focus only on the main content of the page.`
+
+
+ 
+
 
 	const response = await fetch("https://api.anthropic.com/v1/messages", {
   method: "POST",
@@ -54,7 +85,7 @@ async function getSummary(text, userPrompt = "") {
   },
   body: JSON.stringify({
     model: "claude-haiku-4-5-20251001",
-    max_tokens: 300,
+    max_tokens: max_tokens,
     messages: [
   { 
     role: "user", 
@@ -65,7 +96,6 @@ async function getSummary(text, userPrompt = "") {
 
 })
 	let data = await response.json();
-  console.log("Raw API response:", JSON.stringify(data))  // add this line
 	const result = data.content?.[0]?.text ?? "No Summary Provided";
 	return result;
 }

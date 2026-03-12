@@ -23,7 +23,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // ── REQUEST: GET FULL PAGE TEXT ──
   if (message.type === "GET_PAGE_TEXT") {
     // grab all visible text from the page
-    const pageText = document.body.innerText.trim().slice(0, 5000);
+    const clone = document.body.cloneNode(true)
+
+    const noisy = [
+      "nav", "header", "footer", "aside",
+      "script", "style", "noscript",
+      "[class*='nav']", "[class*='menu']",
+      "[class*='footer']", "[class*='header']",
+      "[class*='sidebar']", "[class*='cookie']",
+      "[class*='banner']", "[class*='ad-']",
+      "[id*='nav']", "[id*='footer']",
+      "[id*='header']", "[id*='sidebar']"
+    ]
+    noisy.forEach(selector => {
+      try {
+        clone.querySelectorAll(selector).forEach(el => el.remove())
+      } catch(e) {
+        // some selectors might fail on certain pages, skip them silently
+      }
+    })
+    const pageText = clone.innerText.trim().slice(0, 50000);
     sendResponse({ text: pageText });
   }
 
