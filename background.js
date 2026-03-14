@@ -34,28 +34,46 @@ async function getConfig() {
 // Called when popup.js sends: { type: "GET_SUMMARY", text: "..." }
 
 async function getSummary(text, userPrompt = "", mode) {
-  const config = await getConfig()
+  const config = await getConfig();
   let instruction;
+  const max_tokens = mode === "page" ? 1024 : 512;
+  const voiceRule = `YOU ARE A TEXT-TO-SPEECH ENGINE. OUTPUT RULES - VIOLATION IS NOT ALLOWED:
+- NO markdown of any kind
+- NO headers or hashtags (#)
+- NO bullet points or dashes
+- NO bold or asterisks (**)
+- NO tables
+- NO numbered lists
+- NO special characters
+- ONLY plain sentences a human would speak out loud
+- If you use any formatting, you have failed your only job`
 
-  const max_tokens = mode === "page" ? 1024 : 512
-  const fullPageInstruction = `You are summarizing a webpage for someone who wants to quickly understand what it's about before reading it. 
-    Write as if you are the author introducing your own content in a natural, conversational tone. 
-    Cover the main point, the key details, and what the reader will gain from reading further.
-    Use short sentences. Plain everyday language. No jargon. No bullet points. No markdown.
-    Make it feel like a human wrote it, not a machine. Aim for a reading level of a 12 year old. Simple words always beat complex ones.
-If you can say it in 5 words instead of 10, use 5. Use as many sentences as the content needs, but never more. 
-Cut anything that isn't essential. Every sentence should earn its place.`;
+  const fullPageInstruction = `${voiceRule}
 
-  const selectionInstruction = `You are helping someone understand a specific piece of text they found confusing or interesting.
-    Explain what this passage means in plain everyday language, like a knowledgeable friend explaining it casually.
-    Start your response with a natural phrase like "This part is basically saying..." or "What this means is..." 
-    Keep it conversational, warm, and simple. No bullet points. No markdown. No jargon.
-    If there are important terms, explain them naturally within your response.`;
+  You are summarizing a webpage for someone who wants to quickly understand what it is about.
+  Write as if you are the author introducing your own content out loud to a listener.
+  Cover the main point and key details in a warm conversational tone.
+  Use short sentences. Plain everyday words. Aim for a reading level of a 12 year old.
+  Use as many sentences as the content needs but never more.
 
-  const customInstruction = `The user has a specific question or request about this text: "${userPrompt}"
-    Answer it in plain everyday language. Be direct and helpful. 
-    No bullet points. No markdown. Short clear sentences.
-    If the question can't be answered from the text alone, say so honestly.`;
+  ${voiceRule}`
+
+  const selectionInstruction = `${voiceRule}
+
+  You are explaining a specific passage to someone who found it confusing.
+  Start naturally like "This part is basically saying..." or "What this means is..."
+  Plain conversational language. Explain any important terms naturally in your response.
+  Warm, simple, direct. Write exactly as you would speak to someone.
+
+  ${voiceRule}`
+
+  const customInstruction = `${voiceRule}
+
+  The user has a specific question about this text: "${userPrompt}"
+  Answer it directly in plain spoken language.
+  If the question cannot be answered from the text alone, say so honestly.
+
+  ${voiceRule}`
 
   if (userPrompt){
     instruction = customInstruction;
@@ -144,13 +162,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log(`got message: ${message}`)
   if (message.type === "GET_SUMMARY") {
     console.log("calling getSummary with:", message.text)
-    getSummary(message.text, message.prompt).then((response) => {
+    getSummary(message.text, message.prompt, message.mode).then((response) => {
       console.log("summary ready:", response)
       sendResponse({ summary: response });
     }).catch(err => {
         console.error("Claude error:", err)
         sendResponse({ summary: null, error: err.message })
       });
+    return true;
+  }
+
+  if (message.type === "PLAY_SPEECH") {
+    console.log("background received PLAY_SPEECH, forwarding...")
+    forwardToActiveTab({ type: "PLAY_SPEECH", text: message.text })
+    return true;
+  }
+  if (message.type === "PAUSE_SPEECH") {
+    forwardToActiveTab({ type: "PAUSE_SPEECH" });
+    return true;
+  }
+
+  if (message.type === "STOP_SPEECH") {
+    forwardToActiveTab({ type: "STOP_SPEECH" });
+    return true;
+  }
+
+  if (message.type === "SET_SPEED") {
+    forwardToActiveTab({ type: "SET_SPEED", rate: message.rate });
+    return true;
   }
   // IMPORTANT: return true to keep the message channel open for async response
   return true;

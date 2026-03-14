@@ -99,13 +99,26 @@ const getSelectedText = (id) => {
 const getSummaryFromBackground = (summaryText, userPrompt, mode) => {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage(
-      {type: "GET_SUMMARY", text: summaryText, prompt: userPrompt},
+      {type: "GET_SUMMARY", text: summaryText, prompt: userPrompt, mode: mode},
       (response) => {
         console.log("got summary: " + response.summary);
         resolve(response.summary);
       }
     )
   })
+}
+
+function stripMarkdown(text) {
+  return text
+    .replace(/#{1,6}\s+/g, "")        // remove headings #, ##, ###
+    .replace(/\*\*(.*?)\*\*/g, "$1")   // remove bold **text**
+    .replace(/\*(.*?)\*/g, "$1")       // remove italic *text*
+    .replace(/^\s*[\d]+\.\s+/gm, "")  // remove numbered lists 1. 2. 3.
+    .replace(/^\s*[-*+]\s+/gm, "")    // remove bullet points
+    .replace(/`(.*?)`/g, "$1")        // remove inline code
+    .replace(/\n{2,}/g, ". ")         // replace double newlines with pause
+    .replace(/\n/g, " ")              // replace single newlines with space
+    .trim()
 }
 
 
@@ -152,15 +165,16 @@ btnSummarizePage.addEventListener("click", async () => {
       return
     }
 
-    console.log("AI SUMMARY:", summary)
-    summaryText.textContent = summary
+    const cleanSummary = stripMarkdown(summary);
+    console.log("AI SUMMARY:", cleanSummary)
+    summaryText.textContent = summary;
     summaryContainer.classList.remove("hidden")
     toggleSummaryBtn.textContent = "Hide Summary"
     setStatus("Reading summary...")
 
     chrome.runtime.sendMessage({
       type: "PLAY_SPEECH",
-      text: summary
+      text: cleanSummary
     })
 
   } catch (error) {
@@ -219,13 +233,14 @@ btnReadSelection.addEventListener("click", async () => {
 
     console.log("AI SUMMARY:", summary)
     summaryText.textContent = summary
+    const cleanSummary = stripMarkdown(summary)
     summaryContainer.classList.remove("hidden")
     toggleSummaryBtn.textContent = "Hide Summary"
     setStatus("Reading summary...")
 
     chrome.runtime.sendMessage({
       type: "PLAY_SPEECH",
-      text: summary
+      text: cleanSummary
     })
 
   } catch (error) {

@@ -67,7 +67,11 @@ function speak(text, rate = currentRate) {
     const voice = getBestVoice()
     if (voice) utterance.voice = voice
 
-    utterance.onerror = (e) => console.error("Speech error:", e.error)
+    utterance.onerror = (e) => {
+      console.error("Speech error type:", e.error)
+      console.error("Speech error text length:", text.length)
+      console.error("Speech error text preview:", text.substring(0, 100))
+    }
 
     window.speechSynthesis.speak(utterance)
   }, 50)
@@ -129,6 +133,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // ── SPEECH COMMANDS (forwarded here from background.js) ──
   if (message.type === "PLAY_SPEECH") {
+    console.log("content.js received PLAY_SPEECH, speaking:", message.text.substring(0, 50))
     speak(message.text)
     sendResponse({ ok: true })
   }
@@ -231,7 +236,9 @@ document.addEventListener("mouseup", (event) => {
 
     chrome.runtime.sendMessage({
       type: "GET_SUMMARY",
-      text: selectedText
+      text: selectedText,
+      prompt: '',
+      mode: "selection"
     }, (aiResponse) => {
 
       // If AI fails or returns nothing, exit safely
