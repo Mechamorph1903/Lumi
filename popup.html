@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AccessAI</title>
 
     <!--test
@@ -22,22 +23,13 @@
     </header>
 
     <main>
-
-      <!-- CUSTOM PROMPT (optional) -->
-      <input
-        type="text"
-        id="user-prompt"
-        placeholder="Custom instruction (optional)"
-        aria-label="Custom summarization instruction"
-      />
-
       <!-- PRIMARY ACTIONS -->
       <!-- These buttons trigger the two main features -->
       <!-- The actual click logic lives in popup.js, not here -->
-
       <textarea 
         id="user-prompt" 
-         placeholder="Tell Access AI What to Focus On"
+        placeholder="Tell Access AI What to Focus On"
+        aria-label="Custom summarization instruction"
       ></textarea>
 
       <button id="btn-summarize-page">
@@ -55,12 +47,7 @@
 
       <p id="status-text">Ready</p>
 
-      <!-- SUMMARY BOX -->
-      <!-- Hidden until a summary is ready; populated by popup.js -->
-      <div id="summary-box" hidden>
-        <p id="summary-text"></p>
-      </div>
-
+      
       <!-- AUDIO CONTROLS -->
       <!-- These control the Web Speech API playback -->
       <!-- They should probably be hidden until a summary is being read -->

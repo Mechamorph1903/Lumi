@@ -33,17 +33,12 @@ async function getSummary(text, userPrompt = "") {
 	return result;
 }
 
-const data = await getSummary(`If for some reason you don't see a toggle in the new Outlook for Windows, try these troubleshooting steps:
+const data = await getSummary(`It wasn’t competitive in the first half. We were beating them by double digits until Kobe started going off.
 
-Make sure you try to launch classic Outlook for Windows from the Windows Start Menu, not the new Outlook for Windows. The classic Outlook for Windows is referenced as "Outlook (classic)" in the app list. 
+Once he got hot the commentators got to the point where they expressed how they missed Hoffa because he would be the one to give a hard foul on Kobe to stop his run (LOL). The fact was that we allowed him to embarrass us.
 
-From the Windows Start Menu, type "Registry Editor" in the search box and select the Registry Editor app.
+He wasn’t double teamed, and we pretty much allowed him to go to work on Jalen and Mo Pete. Sam Mitchell was the blame for most of that run but no one remembers the horrible coaching job.
 
-Navigate to the following path: Computer/HKEY_CURRENT_USER/Software/Microsoft/Office/16.0/Outlook/Preferences
+If we double teamed him he might’ve still got 70, but in all likelihood we would’ve still won that game and his 70 would be relatively meaningless. Smitch was a deer caught in headlights. Just an absolute hatchet job of “coaching”.`, "What does he mean?")
 
-Scroll to the bottom of the list to and double click on UseNewOutlook.
-
-Enter 0 in the Value Data field.
-
-Attempt to launch classic Outlook for Windows from the Windows Start Menu.`, "What am i supposed to do with this");
-console.log(data);
+console.log(data)

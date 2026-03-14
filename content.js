@@ -67,7 +67,11 @@ function speak(text, rate = currentRate) {
     const voice = getBestVoice()
     if (voice) utterance.voice = voice
 
-    utterance.onerror = (e) => console.error("Speech error:", e.error)
+    utterance.onerror = (e) => {
+      console.error("Speech error type:", e.error)
+      console.error("Speech error text length:", text.length)
+      console.error("Speech error text preview:", text.substring(0, 100))
+    }
 
     window.speechSynthesis.speak(utterance)
   }, 50)
@@ -97,18 +101,39 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // ── REQUEST: GET FULL PAGE TEXT ──
   if (message.type === "GET_PAGE_TEXT") {
-    const pageText = document.body.innerText.trim().slice(0, 15000)
-    sendResponse({ text: pageText })
+    // grab all visible text from the page
+    const clone = document.body.cloneNode(true)
+
+    const noisy = [
+      "nav", "header", "footer", "aside",
+      "script", "style", "noscript",
+      "[class*='nav']", "[class*='menu']",
+      "[class*='footer']", "[class*='header']",
+      "[class*='sidebar']", "[class*='cookie']",
+      "[class*='banner']", "[class*='ad-']",
+      "[id*='nav']", "[id*='footer']",
+      "[id*='header']", "[id*='sidebar']"
+    ]
+    noisy.forEach(selector => {
+      try {
+        clone.querySelectorAll(selector).forEach(el => el.remove())
+      } catch(e) {
+        // some selectors might fail on certain pages, skip them silently
+      }
+    })
+    const pageText = clone.innerText.trim().slice(0, 50000);
+    sendResponse({ text: pageText });
   }
 
   // ── REQUEST: GET SELECTED TEXT ──
   if (message.type === "GET_SELECTED_TEXT") {
-    const selectedText = window.getSelection().toString()
-    sendResponse({ text: selectedText })
+    const selected = window.getSelection().toString().trim();
+    sendResponse({ text: selected });
   }
 
   // ── SPEECH COMMANDS (forwarded here from background.js) ──
   if (message.type === "PLAY_SPEECH") {
+    console.log("content.js received PLAY_SPEECH, speaking:", message.text.substring(0, 50))
     speak(message.text)
     sendResponse({ ok: true })
   }
@@ -211,7 +236,9 @@ document.addEventListener("mouseup", (event) => {
 
     chrome.runtime.sendMessage({
       type: "GET_SUMMARY",
-      text: selectedText
+      text: selectedText,
+      prompt: '',
+      mode: "selection"
     }, (aiResponse) => {
 
       // If AI fails or returns nothing, exit safely

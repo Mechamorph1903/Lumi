@@ -6,7 +6,6 @@
 
   "background": {
     "service_worker": "background.js",
-    "scripts": ["background.js"],
     "type": "module"
   },
 
@@ -26,7 +25,8 @@
   "permissions": [
     "activeTab",        
     "scripting",        
-    "storage"           
+    "storage",
+    "tabs"          
   ],
 
   "host_permissions": [
@@ -38,6 +38,12 @@
       "id": "accessai@humane-glmg",
       "strict_min_version": "109.0"
     }
-  }
+  },
+   "web_accessible_resources": [
+    {
+      "resources": ["config.json"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }
   
