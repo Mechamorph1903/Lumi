@@ -1,3 +1,12 @@
+// Prevent double-initialization when injected programmatically on a tab
+// that already has the content script from the manifest.
+if (!globalThis.__accessaiLoaded) {
+  Object.defineProperty(globalThis, "__accessaiLoaded", {
+    value: true,
+    writable: false,
+    configurable: false,
+  })
+
 console.log("CONTENT SCRIPT LOADED")
 // content.js
 // This file is injected into every webpage the user visits.
@@ -14,10 +23,76 @@ console.log("CONTENT SCRIPT LOADED")
 // It talks to popup.js using chrome.runtime.onMessage / sendMessage
 
 
-// ─── LISTEN FOR MESSAGES FROM POPUP.JS ───────────────────────────────────────
-// popup.js will send a message asking for text
-// This listener waits for that message and sends back what was asked for
-//test
+// ─── TEXT-TO-SPEECH SYSTEM ────────────────────────────────────────────────────
+// Web Speech API is built into Chrome - no API key or install needed.
+// This is the only context (page/content script) where it is available.
+
+let currentRate = 1    // tracks speed set by slider; updated by SET_SPEED messages
+let lastUtteranceText = ""  // saved so SET_SPEED can restart at new rate
+let speakTimer = null  // guards against rapid-fire speak() calls
+
+// Voices load asynchronously — cache them once they're ready
+let cachedVoices = []
+function loadVoices() {
+  cachedVoices = window.speechSynthesis.getVoices()
+}
+loadVoices()
+window.speechSynthesis.addEventListener("voiceschanged", loadVoices)
+
+function getBestVoice() {
+  const voices = cachedVoices.length ? cachedVoices : window.speechSynthesis.getVoices()
+  return (
+    voices.find(v => v.lang.startsWith("en") && v.localService) ||
+    voices.find(v => v.lang.startsWith("en")) ||
+    voices[0] ||
+    null
+  )
+}
+
+function speak(text, rate = currentRate) {
+  lastUtteranceText = text
+
+  // Cancel anything already playing so we start fresh
+  window.speechSynthesis.cancel()
+
+  // Clear any pending speak timeout to prevent stale utterances
+  if (speakTimer) clearTimeout(speakTimer)
+
+  // Firefox ignores speak() called immediately after cancel().
+  // A brief delay lets the engine reset before queuing new speech.
+  speakTimer = setTimeout(() => {
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.rate = rate
+
+    const voice = getBestVoice()
+    if (voice) utterance.voice = voice
+
+    utterance.onerror = (e) => console.error("Speech error:", e.error)
+
+    window.speechSynthesis.speak(utterance)
+  }, 50)
+}
+
+function pauseSpeech() {
+  // Toggle: pause if speaking, resume if already paused
+  if (window.speechSynthesis.paused) {
+    window.speechSynthesis.resume()
+  } else if (window.speechSynthesis.speaking) {
+    window.speechSynthesis.pause()
+  }
+}
+
+function stopSpeech() {
+  // Cancel any pending delayed speak() call so Stop is reliable
+  if (speakTimer) {
+    clearTimeout(speakTimer)
+    speakTimer = null
+  }
+  window.speechSynthesis.cancel()
+}
+
+
+// ─── LISTEN FOR MESSAGES FROM POPUP.JS / BACKGROUND.JS ───────────────────────
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // ── REQUEST: GET FULL PAGE TEXT ──
@@ -48,9 +123,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // ── REQUEST: GET SELECTED TEXT ──
   if (message.type === "GET_SELECTED_TEXT") {
-    // TODO: grab only what the user has highlighted
     const selected = window.getSelection().toString().trim();
     sendResponse({ text: selected });
+  }
+
+  // ── SPEECH COMMANDS (forwarded here from background.js) ──
+  if (message.type === "PLAY_SPEECH") {
+    speak(message.text)
+    sendResponse({ ok: true })
+  }
+
+  if (message.type === "PAUSE_SPEECH") {
+    pauseSpeech()
+    sendResponse({ ok: true })
+  }
+
+  if (message.type === "STOP_SPEECH") {
+    stopSpeech()
+    sendResponse({ ok: true })
+  }
+
+  if (message.type === "SET_SPEED") {
+    currentRate = message.rate
+    // If speech is active, restart it at the new speed
+    if (window.speechSynthesis.speaking) {
+      const remaining = lastUtteranceText
+      if (remaining) speak(remaining, currentRate)
+    }
+    sendResponse({ ok: true })
   }
 
   return true
@@ -137,11 +237,8 @@ document.addEventListener("mouseup", (event) => {
       // If AI fails or returns nothing, exit safely
       if (!aiResponse || !aiResponse.summary) return
 
-      // Send the summary to the speech system
-      chrome.runtime.sendMessage({
-        type: "PLAY_SPEECH",
-        text: aiResponse.summary
-      })
+      // Read the summary aloud
+      speak(aiResponse.summary)
 
     })
 
@@ -156,3 +253,5 @@ document.addEventListener("mouseup", (event) => {
   document.documentElement.appendChild(floatingButton)
 
 })
+
+} // end guard: window._accessaiLoaded

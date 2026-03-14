@@ -15,20 +15,53 @@
 
 const btnSummarizePage  = document.getElementById("btn-summarize-page")
 const btnReadSelection  = document.getElementById("btn-read-selection")
-const userPrompt        = document.getElementById("user-prompt")
-const btnPause          = document.getElementById("btn-pause")
-const btnStop           = document.getElementById("btn-stop")
-const speedSlider       = document.getElementById("speed-slider")
-const statusText        = document.getElementById("status-text")
-const summaryBox        = document.getElementById("summary-box")
+const userPrompt = document.getElementById("user-prompt")
+const btnPause = document.getElementById("btn-pause")
+const btnStop = document.getElementById("btn-stop")
+const speedSlider = document.getElementById("speed-slider")
+const statusText = document.getElementById("status-text")
+const summaryText = document.getElementById("summary-text")
+const summaryContainer = document.getElementById("summary-container")
+const toggleSummaryBtn = document.getElementById("toggle-summary")
+
+
+//toggle go summary text
+toggleSummaryBtn.addEventListener("click", () => {
+  summaryContainer.classList.toggle("hidden")
+
+  toggleSummaryBtn.textContent =
+    summaryContainer.classList.contains("hidden")
+      ? "Show Summary"
+      : "Hide Summary"
+})
 
 
 // ─── HELPER: UPDATE STATUS MESSAGE ───────────────────────────────────────────
 // Call this whenever the state changes so the user knows what's happening
 
 function setStatus(message) {
-  statusText.textContent =  message;
-  return
+  statusText.textContent = message
+}
+
+function showSummary(text) {
+  summaryText.textContent = text
+  summaryBox.hidden = false
+}
+
+
+// ─── HELPER: ENSURE CONTENT SCRIPT IS INJECTED ─────────────────────────────
+// Tabs open before the extension loaded won't have content.js.
+// Programmatically inject it so messaging doesn't fail.
+
+async function ensureContentScript(tabId) {
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ["content.js"]
+    })
+  } catch {
+    // Restricted page (chrome://, about:, etc.) — injection not possible
+  }
 }
 
 //Promise Helper Functions
@@ -85,20 +118,58 @@ const getSummaryFromBackground = (summaryText, userPrompt, mode) => {
 //   4. Pass the summary to speak()
 
 btnSummarizePage.addEventListener("click", async () => {
-  // TODO
-  setStatus("Reading...")
-  const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
-  const pageText = await getPageText(tab.id);
-  const summary = await getSummaryFromBackground(pageText, userPrompt, "page");
-  console.log(summary)
-  setStatus("Summary Ready.")
-  // setTimeout(setStatus("Reading..."), 2000);
-  // speak(summary);
-  // summaryBox.textContent = summary;
-  
 
+  setStatus("Reading page...")
+
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+
+  if (!tab || !tab.id) {
+    setStatus("No active tab found.")
+    return
+  }
+
+  try {
+    await ensureContentScript(tab.id)
+
+    const pageText = await getPageText(tab.id)
+
+    if (!pageText || !pageText.trim()) {
+      setStatus("No text found on this page.")
+      return
+    }
+
+    console.log("PAGE TEXT:", pageText.substring(0, 200))
+    setStatus("Summarizing with AI...")
+
+    const summary = await getSummaryFromBackground(
+      pageText,
+      userPrompt.value.trim(),
+      "page"
+    )
+
+    if (!summary) {
+      setStatus("AI returned no summary.")
+      return
+    }
+
+    console.log("AI SUMMARY:", summary)
+    summaryText.textContent = summary
+    summaryContainer.classList.remove("hidden")
+    toggleSummaryBtn.textContent = "Hide Summary"
+    setStatus("Reading summary...")
+
+    chrome.runtime.sendMessage({
+      type: "PLAY_SPEECH",
+      text: summary
+    })
+
+  } catch (error) {
+    console.error("Summarize page error:", error)
+    setStatus("Something went wrong: " + error)
+  }
 
 })
+
 
 
 // ─── BUTTON: READ MY SELECTION ────────────────────────────────────────────────
@@ -112,37 +183,75 @@ btnSummarizePage.addEventListener("click", async () => {
 //Flow is identical to Summarize Page,
 //except content.js returns only highlighted text.
 btnReadSelection.addEventListener("click", async () => {
-  // TODO
-  setStatus("Reading...")
-  const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
-  const pageText = await getSelectedText(tab.id);
-  const summary = await getSummaryFromBackground(pageText, userPrompt, "selection");
-  setStatus("Summary Ready.")
-  // setTimeout(setStatus("Reading..."), 2000);
-  // speak(summary);
-  // summaryBox.textContent = summary;
+
+  setStatus("Reading selection...")
+
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+
+  if (!tab || !tab.id) {
+    setStatus("No active tab found.")
+    return
+  }
+
+  try {
+    await ensureContentScript(tab.id)
+
+    const selectedText = await getSelectedText(tab.id)
+
+    if (!selectedText || !selectedText.trim()) {
+      setStatus("No text selected. Please highlight something first.")
+      return
+    }
+
+    console.log("SELECTED TEXT:", selectedText)
+    setStatus("Summarizing with AI...")
+
+    const summary = await getSummaryFromBackground(
+      selectedText,
+      userPrompt.value.trim(),
+      "selection"
+    )
+
+    if (!summary) {
+      setStatus("AI returned no summary.")
+      return
+    }
+
+    console.log("AI SUMMARY:", summary)
+    summaryText.textContent = summary
+    summaryContainer.classList.remove("hidden")
+    toggleSummaryBtn.textContent = "Hide Summary"
+    setStatus("Reading summary...")
+
+    chrome.runtime.sendMessage({
+      type: "PLAY_SPEECH",
+      text: summary
+    })
+
+  } catch (error) {
+    console.error("Read selection error:", error)
+    setStatus("Something went wrong: " + error)
+  }
+
 })
 
 
 // ─── BUTTON: PAUSE / RESUME ───────────────────────────────────────────────────
-// Toggle between pausing and resuming the speech
+// Sends PAUSE_SPEECH to background.js, which forwards to content.js.
+// content.js toggles pause/resume based on current speechSynthesis state.
 
-// SPEECH CONTROLS
-//
-// popup.js does NOT implement speech itself.
-// It simply sends commands to background.js.
-
-
-// This button currently sends PAUSE_SPEECH only.
-// If resume  is added later, this logic will need to be
-// updated to toggle between pause and resume based on speech state.
-//background.js handles speech playback
 btnPause.addEventListener("click", () => {
-  setStatus("Speech paused.")
+  const isPaused = btnPause.textContent.trim() === "Resume"
 
-  chrome.runtime.sendMessage({
-    type: "PAUSE_SPEECH"
-  })
+  if (isPaused) {
+    btnPause.textContent = "Pause"
+    setStatus("Resuming...")
+  } else {
+    btnPause.textContent = "Resume"
+    setStatus("Paused.")
+  }
+
+  chrome.runtime.sendMessage({ type: "PAUSE_SPEECH" })
 })
 
 
@@ -151,11 +260,10 @@ btnPause.addEventListener("click", () => {
 
 
 btnStop.addEventListener("click", () => {
-  setStatus("Speech stopped.")
+  btnPause.textContent = "Pause"
+  setStatus("Stopped.")
 
-  chrome.runtime.sendMessage({
-    type: "STOP_SPEECH"
-  })
+  chrome.runtime.sendMessage({ type: "STOP_SPEECH" })
 })
 
 

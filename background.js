@@ -10,34 +10,31 @@
 //   background.js (the service worker) is the safe place for fetch() calls.
 //
 // It talks to popup.js using chrome.runtime.onMessage.addListener()
-//test
 
 // ─── LOAD API KEY FROM CONFIG ─────────────────────────────────────────────────
-// config.js is gitignored - each team member has their own copy locally
-// Never paste your actual API key anywhere else in the code
-import CONFIG from "./config.js"
+// fetch() works identically in Chrome service workers and Firefox background
+// scripts — no import compatibility issues.  config.json is gitignored.
 
-const apiKey = CONFIG.apiKey;
+let CONFIG = null
+
+async function getConfig() {
+  if (CONFIG) return CONFIG
+  const url = chrome.runtime.getURL("config.json")
+  const res = await fetch(url)
+  CONFIG = await res.json()
+  if (!CONFIG || !CONFIG.apiKey) {
+    throw new Error("Missing API key. Create config.json with your Anthropic key.")
+  }
+  return CONFIG
+}
+
 
 // ─── THE MAIN FUNCTION: GET SUMMARY FROM CLAUDE ──────────────────────────────
-// This is the function the whole backend role is about.
 // Receives a string of text, returns a plain-language summary string.
-
-//I did some code to test my popups in the console
-// AI SUMMARY FUNCTION
-// This function sends webpage text to Claude
-// and returns a plain-language summary.
-//
-// Called when popup.js sends:
-// { type: "GET_SUMMARY", text: "..." }
-//
-// NOTE FOR TEAM: You can also delete all this and write your actual getsummary function.
-// I just used this to test popup.jss
-// This part is the AI integration layer.
-// If you want to adjust prompt quality or model settings, this is the place to do it.
-
+// Called when popup.js sends: { type: "GET_SUMMARY", text: "..." }
 
 async function getSummary(text, userPrompt = "", mode) {
+  const config = await getConfig()
   let instruction;
 
   const max_tokens = mode === "page" ? 1024 : 512
@@ -78,7 +75,7 @@ Cut anything that isn't essential. Every sentence should earn its place.`;
 	const response = await fetch("https://api.anthropic.com/v1/messages", {
   method: "POST",
   headers: {
-    "x-api-key": apiKey,
+    "x-api-key": config.apiKey,
     "anthropic-version": "2023-06-01",
     "content-type": "application/json",
     "anthropic-dangerous-direct-browser-access": "true"   
@@ -93,39 +90,52 @@ Cut anything that isn't essential. Every sentence should earn its place.`;
   }
 ]
   })
+});
 
-})
-	let data = await response.json();
-	const result = data.content?.[0]?.text ?? "No Summary Provided";
-	return result;
+  if (!response.ok) {
+    let detail = ""
+    try {
+      const contentType = response.headers.get("content-type") || ""
+      if (contentType.includes("application/json")) {
+        const json = await response.json()
+        const msg =
+          (json && typeof json === "object" && (json.error?.message || json.message)) ||
+          JSON.stringify(json)
+        detail = typeof msg === "string" ? msg : String(msg)
+      } else {
+        detail = await response.text()
+      }
+    } catch (e) {
+      detail = response.statusText || ""
+    }
+
+    if (detail) {
+      detail = detail.replace(/<[^>]*>/g, "")
+      const maxLen = 300
+      if (detail.length > maxLen) {
+        detail = detail.slice(0, maxLen) + "..."
+      }
+    }
+
+    throw new Error(`API ${response.status}: ${detail || "Unknown error"}`)
+  }
+
+  const data = await response.json()
+  return data.content?.[0]?.text ?? "No summary provided."
+}
+
+// ─── FORWARD SPEECH COMMANDS TO ACTIVE TAB ───────────────────────────────────
+// Web Speech API is not available in service workers.
+// Speech runs in content.js (page context). We forward commands there.
+
+async function forwardToActiveTab(message) {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+  if (!tab || !tab.id) return
+  chrome.tabs.sendMessage(tab.id, message)
 }
 
 
-// ─── THE SPEAK FUNCTION: READ TEXT ALOUD ─────────────────────────────────────
-// Uses the browser's built-in Web Speech API - no API key needed.
-// Receives a summary string and reads it aloud with controls.
-
-function speak(text, rate = 1) {
-  // TODO:
-  // 1. Cancel any speech already playing
-  // 2. Create a new SpeechSynthesisUtterance with the text
-  // 3. Set the rate (speed) from the slider value
-  // 4. Pick the most natural sounding available voice
-  // 5. Call window.speechSynthesis.speak()
-}
-
-function pauseSpeech() {
-  // TODO: window.speechSynthesis.pause()
-}
-
-function stopSpeech() {
-  // TODO: window.speechSynthesis.cancel()
-}
-
-
-// ─── LISTEN FOR MESSAGES FROM POPUP.JS ───────────────────────────────────────
-// popup.js sends a message with the text it wants summarized
-// This listener receives it, calls getSummary(), and sends the result back
+// ─── LISTEN FOR MESSAGES FROM POPUP.JS AND CONTENT.JS ────────────────────────
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   //receives message of text to summarize, calls the getSummary function which is async
@@ -137,7 +147,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     getSummary(message.text, message.prompt).then((response) => {
       console.log("summary ready:", response)
       sendResponse({ summary: response });
-    });
+    }).catch(err => {
+        console.error("Claude error:", err)
+        sendResponse({ summary: null, error: err.message })
+      });
   }
   // IMPORTANT: return true to keep the message channel open for async response
   return true;

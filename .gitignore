@@ -1,5 +1,6 @@
-# API Keys - NEVER commit this
+# API Keys - NEVER commit these
 config.js
+config.json
 
 # OS files
 .DS_Store
