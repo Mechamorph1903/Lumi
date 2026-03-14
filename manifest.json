@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Access AI",
+  "name": "Lumi",
   "version": "1.0",
-  "description": "AI-powered screen reader that summarizes any webpage and reads it aloud",
+  "description": "Lumi lights up what you're reading. No matter how dense the page, how complex the language, or how overwhelming the content — Lumi shines a light on what actually matters and speaks it to you in plain human language.",
 
   "background": {
     "service_worker": "background.js",

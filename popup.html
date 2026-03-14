@@ -2,8 +2,8 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AccessAI</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lumi</title>
 
     <!--test
       This file is the visual panel that appears when you click the extension icon.
@@ -18,18 +18,19 @@
   <body>
 
     <header>
-      <h1>AccessAI</h1>
-      <p>Your AI reading companion</p>
+      <h1>Lumi</h1>
+      <p>Your trusty AI Reading Companion</p>
     </header>
 
     <main>
+
       <!-- PRIMARY ACTIONS -->
       <!-- These buttons trigger the two main features -->
       <!-- The actual click logic lives in popup.js, not here -->
+
       <textarea 
         id="user-prompt" 
-        placeholder="Tell Access AI What to Focus On"
-        aria-label="Custom summarization instruction"
+         placeholder="Tell Lumi What to Focus On"
       ></textarea>
 
       <button id="btn-summarize-page">
@@ -46,8 +47,6 @@
       <!-- States: idle / thinking / reading / done / error -->
 
       <p id="status-text">Ready</p>
-
-      
       <!-- AUDIO CONTROLS -->
       <!-- These control the Web Speech API playback -->
       <!-- They should probably be hidden until a summary is being read -->
