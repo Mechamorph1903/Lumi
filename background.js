@@ -33,29 +33,82 @@ async function getConfig() {
 // Receives a string of text, returns a plain-language summary string.
 // Called when popup.js sends: { type: "GET_SUMMARY", text: "..." }
 
-async function getSummary(text, userPrompt = "") {
-  const config = await getConfig()
+async function getSummary(text, userPrompt = "", mode) {
+  const config = await getConfig();
+  let instruction;
+  const max_tokens = mode === "page" ? 1024 : 512;
+  const voiceRule = `YOU ARE A TEXT-TO-SPEECH ENGINE. OUTPUT RULES - VIOLATION IS NOT ALLOWED:
+- NO markdown of any kind
+- NO headers or hashtags (#)
+- NO bullet points or dashes
+- NO bold or asterisks (**)
+- NO tables
+- NO numbered lists
+- NO special characters
+- ONLY plain sentences a human would speak out loud
+- If you use any formatting, you have failed your only job`
 
-  const baseInstruction = userPrompt
-    ? userPrompt
-    : "Summarize the following in 3-5 plain simple sentences anyone can understand"
+  const fullPageInstruction = `${voiceRule}
 
-  const fullPrompt = `${baseInstruction}. Reply with plain text only, no markdown, no headings, no bullet points. Text to summarize: ${text}`
+  You are summarizing a webpage for someone who wants to quickly understand what it is about.
+  Write as if you are the author introducing your own content out loud to a listener.
+  Cover the main point and key details in a warm conversational tone.
+  Use short sentences. Plain everyday words. Aim for a reading level of a 12 year old.
+  Use as many sentences as the content needs but never more.
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": config.apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-      "anthropic-dangerous-direct-browser-access": "true"
-    },
-    body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 300,
-      messages: [{ role: "user", content: fullPrompt }]
-    })
+  ${voiceRule}`
+
+  const selectionInstruction = `${voiceRule}
+
+  You are explaining a specific passage to someone who found it confusing.
+  Start naturally like "This part is basically saying..." or "What this means is..."
+  Plain conversational language. Explain any important terms naturally in your response.
+  Warm, simple, direct. Write exactly as you would speak to someone.
+
+  ${voiceRule}`
+
+  const customInstruction = `${voiceRule}
+
+  The user has a specific question about this text: "${userPrompt}"
+  Answer it directly in plain spoken language.
+  If the question cannot be answered from the text alone, say so honestly.
+
+  ${voiceRule}`
+
+  if (userPrompt){
+    instruction = customInstruction;
+  } else if (mode === "page"){
+    instruction = fullPageInstruction;
+  } else if (mode === "selection"){
+    instruction = selectionInstruction;
+  }
+
+  const fullPrompt = `${instruction}\n\nText: ${text} \n\n Ignore any text that appears to be navigation menus, cookie notices, 
+    advertisements, or repeated footer content. Focus only on the main content of the page.`
+
+
+ 
+
+
+	const response = await fetch("https://api.anthropic.com/v1/messages", {
+  method: "POST",
+  headers: {
+    "x-api-key": config.apiKey,
+    "anthropic-version": "2023-06-01",
+    "content-type": "application/json",
+    "anthropic-dangerous-direct-browser-access": "true"   
+  },
+  body: JSON.stringify({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: max_tokens,
+    messages: [
+  { 
+    role: "user", 
+    content: fullPrompt
+  }
+]
   })
+});
 
   if (!response.ok) {
     let detail = ""
@@ -103,36 +156,41 @@ async function forwardToActiveTab(message) {
 // ─── LISTEN FOR MESSAGES FROM POPUP.JS AND CONTENT.JS ────────────────────────
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-
-  // AI SUMMARY REQUEST
-  // Called when popup.js sends page or selection text
+  //receives message of text to summarize, calls the getSummary function which is async
+  //so returns promise object, this is worked around by using .then() which waits for a 
+  //value then performs another action 
+  console.log(`got message: ${message}`)
   if (message.type === "GET_SUMMARY") {
-    getSummary(message.text, message.userPrompt)
-      .then(summary => sendResponse({ summary }))
-      .catch(err => {
+    console.log("calling getSummary with:", message.text)
+    getSummary(message.text, message.prompt, message.mode).then((response) => {
+      console.log("summary ready:", response)
+      sendResponse({ summary: response });
+    }).catch(err => {
         console.error("Claude error:", err)
         sendResponse({ summary: null, error: err.message })
-      })
-    return true  // keep channel open for async response
+      });
+    return true;
   }
 
-  // SPEECH COMMANDS
-  // Forward to content.js running in the active tab, which owns the Web Speech API
   if (message.type === "PLAY_SPEECH") {
+    console.log("background received PLAY_SPEECH, forwarding...")
     forwardToActiveTab({ type: "PLAY_SPEECH", text: message.text })
+    return true;
   }
-
   if (message.type === "PAUSE_SPEECH") {
-    forwardToActiveTab({ type: "PAUSE_SPEECH" })
+    forwardToActiveTab({ type: "PAUSE_SPEECH" });
+    return true;
   }
 
   if (message.type === "STOP_SPEECH") {
-    forwardToActiveTab({ type: "STOP_SPEECH" })
+    forwardToActiveTab({ type: "STOP_SPEECH" });
+    return true;
   }
 
   if (message.type === "SET_SPEED") {
-    forwardToActiveTab({ type: "SET_SPEED", rate: message.rate })
+    forwardToActiveTab({ type: "SET_SPEED", rate: message.rate });
+    return true;
   }
-
-  return true
-})
+  // IMPORTANT: return true to keep the message channel open for async response
+  return true;
+});

@@ -146,6 +146,7 @@ button:focus {
   margin-top: 4px;
   cursor: pointer;
 }
+<<<<<<< HEAD
 /* ── LANGUAGE SELECTOR ───────────────────────────────────────────────────── */
 /*
   - Always keep a visible focus ring (never outline: none)
@@ -191,6 +192,9 @@ button:focus {
   outline: 2px solid #ffd54f;
   border-color: transparent;
 }
+=======
+
+>>>>>>> main
 
 #user-prompt {
   width: 100%;
@@ -198,6 +202,10 @@ button:focus {
   margin-bottom: 10px;
   resize: none;
 }
+<<<<<<< HEAD
+=======
+
+>>>>>>> main
 #summary-container {
   margin-top: 12px;
   padding: 12px;
@@ -208,14 +216,29 @@ button:focus {
   overflow-y: auto;
   box-sizing: border-box;
 }
+<<<<<<< HEAD
+=======
+
+>>>>>>> main
 #summary-text {
   margin-top: 8px;
   line-height: 1.4;
   white-space: pre-wrap;
 }
+<<<<<<< HEAD
 .hidden {
   display: none;
 }
 #toggle-summary {
   margin-top: 8px;
 }      
+=======
+
+.hidden {
+  display: none;
+}
+
+#toggle-summary {
+  margin-top: 8px;
+}
+>>>>>>> main

@@ -2,7 +2,8 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>AccessAI</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lumi</title>
 
     <!--test
       This file is the visual panel that appears when you click the extension icon.
@@ -17,23 +18,20 @@
   <body>
 
     <header>
-      <h1>AccessAI</h1>
-      <p>Your AI reading companion</p>
+      <h1>Lumi</h1>
+      <p>Your trusty AI Reading Companion</p>
     </header>
 
     <main>
 
-      <!-- CUSTOM PROMPT (optional) -->
-      <input
-        type="text"
-        id="user-prompt"
-        placeholder="Custom instruction (optional)"
-        aria-label="Custom summarization instruction"
-      />
-
       <!-- PRIMARY ACTIONS -->
       <!-- These buttons trigger the two main features -->
       <!-- The actual click logic lives in popup.js, not here -->
+
+      <textarea 
+        id="user-prompt" 
+         placeholder="Tell Lumi What to Focus On"
+      ></textarea>
 
       <button id="btn-summarize-page">
         Summarize Full Page
@@ -49,13 +47,6 @@
       <!-- States: idle / thinking / reading / done / error -->
 
       <p id="status-text">Ready</p>
-
-      <!-- SUMMARY BOX -->
-      <!-- Hidden until a summary is ready; populated by popup.js -->
-      <div id="summary-box" hidden>
-        <p id="summary-text"></p>
-      </div>
-
       <!-- AUDIO CONTROLS -->
       <!-- These control the Web Speech API playback -->
       <!-- They should probably be hidden until a summary is being read -->
@@ -94,6 +85,12 @@
             <option value="ko">Korean</option>
           </select>
       </div>
+
+      <button id="toggle-summary">Show Summary</button>
+        <div id="summary-container" class="hidden">
+          <h3>Summary</h3>
+          <p id="summary-text"></p>
+        </div>
 
     </main>
 

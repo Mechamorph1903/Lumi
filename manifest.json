@@ -1,18 +1,17 @@
 {
   "manifest_version": 3,
-  "name": "Lazey",
+  "name": "Lumi",
   "version": "1.0",
-  "description": "AI-powered screen reader that summarizes any webpage and reads it aloud",
+  "description": "Lumi lights up what you're reading. No matter how dense the page, how complex the language, or how overwhelming the content — Lumi shines a light on what actually matters and speaks it to you in plain human language.",
 
   "background": {
     "service_worker": "background.js",
-    "scripts": ["background.js"],
     "type": "module"
   },
 
   "action": {
     "default_popup": "popup.html",
-    "default_icon": "extension-pic.png"
+    "default_icon": "icon.png"
   },
 
   
@@ -26,7 +25,8 @@
   "permissions": [
     "activeTab",        
     "scripting",        
-    "storage"           
+    "storage",
+    "tabs"          
   ],
 
   "host_permissions": [
@@ -38,6 +38,12 @@
       "id": "accessai@humane-glmg",
       "strict_min_version": "109.0"
     }
-  }
+  },
+   "web_accessible_resources": [
+    {
+      "resources": ["config.json"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }
   
