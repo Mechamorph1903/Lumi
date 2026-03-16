@@ -51,19 +51,6 @@ function getLanguage(code){
   return langs[code] || "English"
 };
 
-
-// async function testPolly() {
-//   const config = await getConfig()  // move this outside try block
-
-//   try {     
-//     const url = await speakWithPolly("Hello, I am Lumi, your reading companion.", "en")
-//     console.log("Polly works! Audio URL:", url)
-//   } catch (err) {
-//     console.error("Polly failed:", err)
-//   }
-// }
-
-
 // 1 - sha256 helper
 async function sha256(message) {
   const encoder = new TextEncoder()
@@ -161,18 +148,19 @@ async function signAWSRequest({ method, endpoint, body, service, region, accessK
 // 6 - voice map
 function getPollyVoice(languageCode) {
   const voices = {
-    en: { VoiceId: "Aria",    LanguageCode: "en-US",  Engine: "neural" },
+    en: { VoiceId: "Gregory",    LanguageCode: "en-US",  Engine: "neural" },
     es: { VoiceId: "Lupe",    LanguageCode: "es-US",  Engine: "neural" },
-    fr: { VoiceId: "Lea",     LanguageCode: "fr-FR",  Engine: "neural" },
+    fr: { VoiceId: "Liam",     LanguageCode: "fr-CA",  Engine: "neural" },
     de: { VoiceId: "Vicki",   LanguageCode: "de-DE",  Engine: "neural" },
     zh: { VoiceId: "Zhiyu",   LanguageCode: "cmn-CN", Engine: "neural" },
     ar: { VoiceId: "Hala",    LanguageCode: "arb",    Engine: "neural" },
     hi: { VoiceId: "Kajal",   LanguageCode: "hi-IN",  Engine: "neural" },
     pt: { VoiceId: "Camila",  LanguageCode: "pt-BR",  Engine: "neural" },
     ja: { VoiceId: "Takumi",  LanguageCode: "ja-JP",  Engine: "neural" },
-    it: { VoiceId: "Bianca",  LanguageCode: "it-IT",  Engine: "neural" },
+    it: { VoiceId: "Adriano",  LanguageCode: "it-IT",  Engine: "neural" },
     ko: { VoiceId: "Seoyeon", LanguageCode: "ko-KR",  Engine: "neural" }
   }
+  console.log(`I was given this lang code: ${languageCode}`);
   return voices[languageCode] || voices.en
 }
 
@@ -181,6 +169,45 @@ async function speakWithPolly(text, language = "en") {
   const config = await getConfig()
   const voice  = getPollyVoice(language)
 
+  // split text into chunks under 2800 chars
+  // split on sentence boundaries so speech sounds natural
+  const chunks = splitIntoChunks(text, 2800)
+  console.log(`Polly: splitting into ${chunks.length} chunks`)
+
+  const audioDataUrls = []
+
+  for (const chunk of chunks) {
+    const url = await pollySingleChunk(chunk, voice, config)
+    audioDataUrls.push(url)
+  }
+
+  return audioDataUrls
+}
+
+// splits text on sentence boundaries to keep chunks natural
+function splitIntoChunks(text, maxLength) {
+  if (text.length <= maxLength) return [text]
+
+  const chunks = []
+  let remaining = text
+
+  while (remaining.length > maxLength) {
+    // find last sentence ending before maxLength
+    let splitAt = remaining.lastIndexOf(". ", maxLength)
+    if (splitAt === -1) splitAt = remaining.lastIndexOf("! ", maxLength)
+    if (splitAt === -1) splitAt = remaining.lastIndexOf("? ", maxLength)
+    if (splitAt === -1) splitAt = maxLength  // no sentence boundary found, hard split
+
+    chunks.push(remaining.slice(0, splitAt + 1).trim())
+    remaining = remaining.slice(splitAt + 1).trim()
+  }
+
+  if (remaining.length > 0) chunks.push(remaining)
+  return chunks
+}
+
+// handles a single Polly API call for one chunk
+async function pollySingleChunk(text, voice, config) {
   const endpoint = `https://polly.${config.awsRegion}.amazonaws.com/v1/speech`
 
   const body = JSON.stringify({
@@ -201,11 +228,39 @@ async function speakWithPolly(text, language = "en") {
     secretAccessKey: config.awsSecretAccessKey
   })
 
-  const response = await fetch(endpoint, {
+  let response = await fetch(endpoint, {
     method:  "POST",
     headers: signature.headers,
     body
   })
+
+  // fallback to standard engine if neural fails
+  if (!response.ok && voice.Engine === "neural") {
+    console.warn("Neural failed, retrying with standard...")
+    const fallbackBody = JSON.stringify({
+      Engine:       "standard",
+      LanguageCode: voice.LanguageCode,
+      OutputFormat: "mp3",
+      Text:         text,
+      VoiceId:      voice.VoiceId
+    })
+
+    const fallbackSignature = await signAWSRequest({
+      method:          "POST",
+      endpoint,
+      body:            fallbackBody,
+      service:         "polly",
+      region:          config.awsRegion,
+      accessKeyId:     config.awsAccessKeyId,
+      secretAccessKey: config.awsSecretAccessKey
+    })
+
+    response = await fetch(endpoint, {
+      method:  "POST",
+      headers: fallbackSignature.headers,
+      body:    fallbackBody
+    })
+  }
 
   if (!response.ok) {
     const err = await response.text()
@@ -213,10 +268,14 @@ async function speakWithPolly(text, language = "en") {
   }
 
   const audioBuffer = await response.arrayBuffer()
-  const base64 = btoa(
-    String.fromCharCode(...new Uint8Array(audioBuffer))
-  )
-  return `data:audio/mp3;base64,${base64}`
+  const uint8Array = new Uint8Array(audioBuffer)
+
+  let binary = ""
+  for (let i = 0; i < uint8Array.length; i++) {
+    binary += String.fromCharCode(uint8Array[i])
+  }
+
+  return `data:audio/mp3;base64,${btoa(binary)}`
 }
 
 
@@ -235,7 +294,7 @@ async function getSummary(text, userPrompt = "", mode, language) {
 - NO tables
 - NO numbered lists
 - NO special characters
-- ONLY plain sentences a human would speak out loud
+- ONLY plain sentences — in whatever language is specified above
 - If you use any formatting, you have failed your only job`
 
   const fullPageInstruction = `${voiceRule}
@@ -273,11 +332,8 @@ async function getSummary(text, userPrompt = "", mode, language) {
     instruction = selectionInstruction;
   }
 
-  const fullPrompt = `${instruction}\n\n${languageInstruction}\n\nText: ${text} \n\n Ignore any text that appears to be navigation menus, cookie notices, 
+  const fullPrompt = `${languageInstruction}\n\n${instruction}\n\nText: ${text} \n\n Ignore any text that appears to be navigation menus, cookie notices, 
     advertisements, or repeated footer content. Focus only on the main content of the page.`
-
-
- 
 
 
 	const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -363,9 +419,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "PLAY_SPEECH") {
-    console.log("background received PLAY_SPEECH, forwarding...")
-    forwardToActiveTab({ type: "PLAY_SPEECH", text: message.text })
-    return true;
+    console.log("background received PLAY_SPEECH, calling Polly...")
+    speakWithPolly(message.text, message.language)
+      .then(audioDataUrls => {
+        forwardToActiveTab({ type: "STOP_SPEECH" })
+        setTimeout(() => {
+          forwardToActiveTab({ 
+            type: "PLAY_AUDIO_QUEUE", 
+            urls: audioDataUrls  // send array not single url
+          })
+        }, 100)
+      })
+      .catch(err => {
+        console.error("Polly failed, falling back to browser voice:", err)
+        forwardToActiveTab({ type: "STOP_SPEECH" })
+        forwardToActiveTab({ type: "PLAY_SPEECH", text: message.text })
+      })
+    return true
   }
   if (message.type === "PAUSE_SPEECH") {
     forwardToActiveTab({ type: "PAUSE_SPEECH" });
