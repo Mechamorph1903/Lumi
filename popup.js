@@ -26,8 +26,8 @@ const summaryBox        = document.getElementById("summary-box")
 const summaryText       = document.getElementById("summary-text")
 const summaryContainer  = document.getElementById("summary-container")
 const toggleSummaryBtn  = document.getElementById("toggle-summary")
+const SKIP_SECONDS = 10  // how many seconds to jump on rewind / fast-forward
 
-<<<<<<< daniel
 //language last used
 chrome.storage.local.get("lumiLanguage", (result) => {
   if (result.lumiLanguage) {
@@ -59,12 +59,9 @@ chrome.storage.local.get("lumiInput", (result) => {
 userPrompt.addEventListener("focusout", () => {
   chrome.storage.local.set({ lumiInput: userPrompt.value })
 })
-=======
-const SKIP_SECONDS = 10  // how many seconds to jump on rewind / fast-forward
 
 
 // ─── TOGGLE SUMMARY TEXT ─────────────────────────────────────────────────────
->>>>>>> music-feature
 
 toggleSummaryBtn.addEventListener("click", () => {
   summaryContainer.classList.toggle("hidden")
