@@ -33,10 +33,259 @@ async function getConfig() {
 // Receives a string of text, returns a plain-language summary string.
 // Called when popup.js sends: { type: "GET_SUMMARY", text: "..." }
 
-async function getSummary(text, userPrompt = "", mode) {
+function getLanguage(code){
+  const langs = {
+    en: "English",
+    es: "Spanish",
+    fr: "French",
+    de: "German",
+    zh: "Chinese",
+    ja: "Japanese",
+    ar: "Arabic",
+    pt: "Portuguese",
+    hi: "Hindi",
+    ko: "Korean",
+    it: "Italian"
+  }
+
+  return langs[code] || "English"
+};
+
+// 1 - sha256 helper
+async function sha256(message) {
+  const encoder = new TextEncoder()
+  const data = encoder.encode(message)
+  const hash = await crypto.subtle.digest("SHA-256", data)
+  return Array.from(new Uint8Array(hash))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("")
+}
+
+// 2 - hmac helper
+async function hmac(key, message) {
+  const encoder = new TextEncoder()
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    typeof key === "string" ? encoder.encode(key) : key,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  )
+  return crypto.subtle.sign("HMAC", cryptoKey, encoder.encode(message))
+}
+
+// 3 - hmac hex helper
+async function hmacHex(key, message) {
+  const signature = await hmac(key, message)
+  return Array.from(new Uint8Array(signature))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("")
+}
+
+// 4 - signing key helper
+async function getSigningKey(secretKey, dateStamp, region, service) {
+  const kDate    = await hmac("AWS4" + secretKey, dateStamp)
+  const kRegion  = await hmac(kDate, region)
+  const kService = await hmac(kRegion, service)
+  const kSigning = await hmac(kService, "aws4_request")
+  return kSigning
+}
+
+// 5 - full request signer
+async function signAWSRequest({ method, endpoint, body, service, region, accessKeyId, secretAccessKey }) {
+  const url = new URL(endpoint)
+  const now = new Date()
+
+  const dateStamp = now.toISOString().slice(0, 10).replace(/-/g, "")
+  const timeStamp = now.toISOString().replace(/[:-]|\.\d{3}/g, "").slice(0, 15) + "Z"
+
+  const contentHash = await sha256(body)
+
+  const headers = {
+    "content-type": "application/json",
+    "host": url.hostname,
+    "x-amz-content-sha256": contentHash,
+    "x-amz-date": timeStamp
+  }
+
+  const canonicalHeaders = Object.entries(headers)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k}:${v}`)
+    .join("\n") + "\n"
+
+  const signedHeaders = Object.keys(headers).sort().join(";")
+
+  const canonicalRequest = [
+    method,
+    url.pathname,
+    "",
+    canonicalHeaders,
+    signedHeaders,
+    contentHash
+  ].join("\n")
+
+  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`
+
+  const stringToSign = [
+    "AWS4-HMAC-SHA256",
+    timeStamp,
+    credentialScope,
+    await sha256(canonicalRequest)
+  ].join("\n")
+
+  const signingKey = await getSigningKey(secretAccessKey, dateStamp, region, service)
+  const signature  = await hmacHex(signingKey, stringToSign)
+
+  headers["Authorization"] = [
+    `AWS4-HMAC-SHA256 Credential=${accessKeyId}/${credentialScope}`,
+    `SignedHeaders=${signedHeaders}`,
+    `Signature=${signature}`
+  ].join(", ")
+
+  return { headers }
+}
+
+// 6 - voice map
+function getPollyVoice(languageCode) {
+  const voices = {
+    en: { VoiceId: "Gregory",    LanguageCode: "en-US",  Engine: "neural" },
+    es: { VoiceId: "Lupe",    LanguageCode: "es-US",  Engine: "neural" },
+    fr: { VoiceId: "Liam",     LanguageCode: "fr-CA",  Engine: "neural" },
+    de: { VoiceId: "Vicki",   LanguageCode: "de-DE",  Engine: "neural" },
+    zh: { VoiceId: "Zhiyu",   LanguageCode: "cmn-CN", Engine: "neural" },
+    ar: { VoiceId: "Hala",    LanguageCode: "arb",    Engine: "neural" },
+    hi: { VoiceId: "Kajal",   LanguageCode: "hi-IN",  Engine: "neural" },
+    pt: { VoiceId: "Camila",  LanguageCode: "pt-BR",  Engine: "neural" },
+    ja: { VoiceId: "Takumi",  LanguageCode: "ja-JP",  Engine: "neural" },
+    it: { VoiceId: "Adriano",  LanguageCode: "it-IT",  Engine: "neural" },
+    ko: { VoiceId: "Seoyeon", LanguageCode: "ko-KR",  Engine: "neural" }
+  }
+  console.log(`I was given this lang code: ${languageCode}`);
+  return voices[languageCode] || voices.en
+}
+
+// 7 - main polly function
+async function speakWithPolly(text, language = "en") {
+  const config = await getConfig()
+  const voice  = getPollyVoice(language)
+
+  // split text into chunks under 2800 chars
+  // split on sentence boundaries so speech sounds natural
+  const chunks = splitIntoChunks(text, 2800)
+  console.log(`Polly: splitting into ${chunks.length} chunks`)
+
+  const audioDataUrls = []
+
+  for (const chunk of chunks) {
+    const url = await pollySingleChunk(chunk, voice, config)
+    audioDataUrls.push(url)
+  }
+
+  return audioDataUrls
+}
+
+// splits text on sentence boundaries to keep chunks natural
+function splitIntoChunks(text, maxLength) {
+  if (text.length <= maxLength) return [text]
+
+  const chunks = []
+  let remaining = text
+
+  while (remaining.length > maxLength) {
+    // find last sentence ending before maxLength
+    let splitAt = remaining.lastIndexOf(". ", maxLength)
+    if (splitAt === -1) splitAt = remaining.lastIndexOf("! ", maxLength)
+    if (splitAt === -1) splitAt = remaining.lastIndexOf("? ", maxLength)
+    if (splitAt === -1) splitAt = maxLength  // no sentence boundary found, hard split
+
+    chunks.push(remaining.slice(0, splitAt + 1).trim())
+    remaining = remaining.slice(splitAt + 1).trim()
+  }
+
+  if (remaining.length > 0) chunks.push(remaining)
+  return chunks
+}
+
+// handles a single Polly API call for one chunk
+async function pollySingleChunk(text, voice, config) {
+  const endpoint = `https://polly.${config.awsRegion}.amazonaws.com/v1/speech`
+
+  const body = JSON.stringify({
+    Engine:       voice.Engine,
+    LanguageCode: voice.LanguageCode,
+    OutputFormat: "mp3",
+    Text:         text,
+    VoiceId:      voice.VoiceId
+  })
+
+  const signature = await signAWSRequest({
+    method:          "POST",
+    endpoint,
+    body,
+    service:         "polly",
+    region:          config.awsRegion,
+    accessKeyId:     config.awsAccessKeyId,
+    secretAccessKey: config.awsSecretAccessKey
+  })
+
+  let response = await fetch(endpoint, {
+    method:  "POST",
+    headers: signature.headers,
+    body
+  })
+
+  // fallback to standard engine if neural fails
+  if (!response.ok && voice.Engine === "neural") {
+    console.warn("Neural failed, retrying with standard...")
+    const fallbackBody = JSON.stringify({
+      Engine:       "standard",
+      LanguageCode: voice.LanguageCode,
+      OutputFormat: "mp3",
+      Text:         text,
+      VoiceId:      voice.VoiceId
+    })
+
+    const fallbackSignature = await signAWSRequest({
+      method:          "POST",
+      endpoint,
+      body:            fallbackBody,
+      service:         "polly",
+      region:          config.awsRegion,
+      accessKeyId:     config.awsAccessKeyId,
+      secretAccessKey: config.awsSecretAccessKey
+    })
+
+    response = await fetch(endpoint, {
+      method:  "POST",
+      headers: fallbackSignature.headers,
+      body:    fallbackBody
+    })
+  }
+
+  if (!response.ok) {
+    const err = await response.text()
+    throw new Error(`Polly error ${response.status}: ${err}`)
+  }
+
+  const audioBuffer = await response.arrayBuffer()
+  const uint8Array = new Uint8Array(audioBuffer)
+
+  let binary = ""
+  for (let i = 0; i < uint8Array.length; i++) {
+    binary += String.fromCharCode(uint8Array[i])
+  }
+
+  return `data:audio/mp3;base64,${btoa(binary)}`
+}
+
+
+
+
+async function getSummary(text, userPrompt = "", mode, language) {
   const config = await getConfig();
   let instruction;
   const max_tokens = mode === "page" ? 1024 : 512;
+  const languageInstruction = language && language != 'en' ? `Respond entirelly in ${getLanguage(language)}. Everyword of your response must be in ${getLanguage(language)}`:""
   const voiceRule = `YOU ARE A TEXT-TO-SPEECH ENGINE. OUTPUT RULES - VIOLATION IS NOT ALLOWED:
 - NO markdown of any kind
 - NO headers or hashtags (#)
@@ -45,7 +294,7 @@ async function getSummary(text, userPrompt = "", mode) {
 - NO tables
 - NO numbered lists
 - NO special characters
-- ONLY plain sentences a human would speak out loud
+- ONLY plain sentences — in whatever language is specified above
 - If you use any formatting, you have failed your only job`
 
   const fullPageInstruction = `${voiceRule}
@@ -83,11 +332,8 @@ async function getSummary(text, userPrompt = "", mode) {
     instruction = selectionInstruction;
   }
 
-  const fullPrompt = `${instruction}\n\nText: ${text} \n\n Ignore any text that appears to be navigation menus, cookie notices, 
+  const fullPrompt = `${languageInstruction}\n\n${instruction}\n\nText: ${text} \n\n Ignore any text that appears to be navigation menus, cookie notices, 
     advertisements, or repeated footer content. Focus only on the main content of the page.`
-
-
- 
 
 
 	const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -159,10 +405,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   //receives message of text to summarize, calls the getSummary function which is async
   //so returns promise object, this is worked around by using .then() which waits for a 
   //value then performs another action 
-  console.log(`got message: ${message}`)
+  console.log("got message:", message, "language:", message.language)
   if (message.type === "GET_SUMMARY") {
     console.log("calling getSummary with:", message.text)
-    getSummary(message.text, message.prompt, message.mode).then((response) => {
+    getSummary(message.text, message.prompt, message.mode, message.language).then((response) => {
       console.log("summary ready:", response)
       sendResponse({ summary: response });
     }).catch(err => {
@@ -173,9 +419,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "PLAY_SPEECH") {
-    console.log("background received PLAY_SPEECH, forwarding...")
-    forwardToActiveTab({ type: "PLAY_SPEECH", text: message.text })
-    return true;
+    console.log("background received PLAY_SPEECH, calling Polly...")
+    speakWithPolly(message.text, message.language)
+      .then(audioDataUrls => {
+        forwardToActiveTab({ type: "STOP_SPEECH" })
+        setTimeout(() => {
+          forwardToActiveTab({ 
+            type: "PLAY_AUDIO_QUEUE", 
+            urls: audioDataUrls  // send array not single url
+          })
+        }, 100)
+      })
+      .catch(err => {
+        console.error("Polly failed, falling back to browser voice:", err)
+        forwardToActiveTab({ type: "STOP_SPEECH" })
+        forwardToActiveTab({ type: "PLAY_SPEECH", text: message.text })
+      })
+    return true
   }
   if (message.type === "PAUSE_SPEECH") {
     forwardToActiveTab({ type: "PAUSE_SPEECH" });

@@ -27,10 +27,44 @@ const summaryText       = document.getElementById("summary-text")
 const summaryContainer  = document.getElementById("summary-container")
 const toggleSummaryBtn  = document.getElementById("toggle-summary")
 
+<<<<<<< daniel
+//language last used
+chrome.storage.local.get("lumiLanguage", (result) => {
+  if (result.lumiLanguage) {
+    languageSelect.value = result.lumiLanguage
+  }
+})
+
+// save language whenever user changes it
+languageSelect.addEventListener("change", () => {
+  chrome.storage.local.set({ lumiLanguage: languageSelect.value })
+})
+
+//summary last used
+chrome.storage.local.get("lumiSummary", (result) => {
+  if (result.lumiSummary) {
+    summaryText.textContent = result.lumiSummary
+  }
+  summaryContainer.classList.remove("hidden")
+  toggleSummaryBtn.textContent = "Hide Summary"
+})
+
+//input last entered
+chrome.storage.local.get("lumiInput", (result) => {
+  if (result.lumiInput) {
+    userPrompt.value = result.lumiInput
+  }
+})
+// save Input whenever user changes it
+userPrompt.addEventListener("focusout", () => {
+  chrome.storage.local.set({ lumiInput: userPrompt.value })
+})
+=======
 const SKIP_SECONDS = 10  // how many seconds to jump on rewind / fast-forward
 
 
 // ─── TOGGLE SUMMARY TEXT ─────────────────────────────────────────────────────
+>>>>>>> music-feature
 
 toggleSummaryBtn.addEventListener("click", () => {
   summaryContainer.classList.toggle("hidden")
@@ -121,18 +155,6 @@ const getSummaryFromBackground = (summaryText, userPrompt, mode) => {
   })
 }
 
-function stripMarkdown(text) {
-  return text
-    .replace(/#{1,6}\s+/g, "")        // remove headings #, ##, ###
-    .replace(/\*\*(.*?)\*\*/g, "$1")   // remove bold **text**
-    .replace(/\*(.*?)\*/g, "$1")       // remove italic *text*
-    .replace(/^\s*[\d]+\.\s+/gm, "")  // remove numbered lists 1. 2. 3.
-    .replace(/^\s*[-*+]\s+/gm, "")    // remove bullet points
-    .replace(/`(.*?)`/g, "$1")        // remove inline code
-    .replace(/\n{2,}/g, ". ")         // replace double newlines with pause
-    .replace(/\n/g, " ")              // replace single newlines with space
-    .trim()
-}
 
 
 // ─── BUTTON: SUMMARIZE FULL PAGE ─────────────────────────────────────────────
@@ -171,19 +193,21 @@ btnSummarizePage.addEventListener("click", async () => {
       return
     }
 
-    const cleanSummary = stripMarkdown(summary)
-    console.log("AI SUMMARY:", cleanSummary)
+    console.log("AI SUMMARY:", summary)
     summaryText.textContent = summary
     summaryContainer.classList.remove("hidden")
     toggleSummaryBtn.textContent = "Hide Summary"
     setStatus("Reading summary...")
+    chrome.storage.local.set({ lumiSummary: summary })
+
 
     // Reset play/pause button to playing state whenever new speech starts
     resetToPlayingState()
 
     chrome.runtime.sendMessage({
       type: "PLAY_SPEECH",
-      text: cleanSummary
+      text: summary,
+      language: languageSelect.value
     })
 
   } catch (error) {
@@ -229,19 +253,20 @@ btnReadSelection.addEventListener("click", async () => {
       return
     }
 
-    const cleanSummary = stripMarkdown(summary)
     console.log("AI SUMMARY:", summary)
     summaryText.textContent = summary
     summaryContainer.classList.remove("hidden")
     toggleSummaryBtn.textContent = "Hide Summary"
     setStatus("Reading summary...")
+    chrome.storage.local.set({ lumiSummary: summary })
 
     // Reset play/pause button to playing state whenever new speech starts
     resetToPlayingState()
 
     chrome.runtime.sendMessage({
       type: "PLAY_SPEECH",
-      text: cleanSummary
+      text: summary,
+      language: languageSelect.value
     })
 
   } catch (error) {
