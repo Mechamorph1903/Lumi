@@ -451,6 +451,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     forwardToActiveTab({ type: "SET_SPEED", rate: message.rate });
     return true;
   }
+
+  // ── SEEK: forward seek request to content.js audio player ──
+  if (message.type === "SEEK_AUDIO") {
+    chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+      if (!tab || !tab.id) { sendResponse({ ok: false }); return }
+      chrome.tabs.sendMessage(tab.id, { type: "SEEK_AUDIO", time: message.time }, (resp) => {
+        sendResponse(resp || { ok: false })
+      })
+    })
+    return true
+  }
+
+  // ── GET_PLAYBACK_STATE: popup asks content.js for current audio state ──
+  if (message.type === "GET_PLAYBACK_STATE") {
+    chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+      if (!tab || !tab.id) {
+        sendResponse({ currentTime: 0, totalDuration: 0, isPlaying: false, isPaused: false })
+        return
+      }
+      chrome.tabs.sendMessage(tab.id, { type: "GET_PLAYBACK_STATE" }, (resp) => {
+        sendResponse(resp || { currentTime: 0, totalDuration: 0, isPlaying: false, isPaused: false })
+      })
+    })
+    return true
+  }
+
   // IMPORTANT: return true to keep the message channel open for async response
   return true;
 });
