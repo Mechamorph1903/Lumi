@@ -33,10 +33,200 @@ async function getConfig() {
 // Receives a string of text, returns a plain-language summary string.
 // Called when popup.js sends: { type: "GET_SUMMARY", text: "..." }
 
-async function getSummary(text, userPrompt = "", mode) {
+function getLanguage(code){
+  const langs = {
+    en: "English",
+    es: "Spanish",
+    fr: "French",
+    de: "German",
+    zh: "Chinese",
+    ja: "Japanese",
+    ar: "Arabic",
+    pt: "Portuguese",
+    hi: "Hindi",
+    ko: "Korean",
+    it: "Italian"
+  }
+
+  return langs[code] || "English"
+};
+
+
+// async function testPolly() {
+//   const config = await getConfig()  // move this outside try block
+
+//   try {     
+//     const url = await speakWithPolly("Hello, I am Lumi, your reading companion.", "en")
+//     console.log("Polly works! Audio URL:", url)
+//   } catch (err) {
+//     console.error("Polly failed:", err)
+//   }
+// }
+
+
+// 1 - sha256 helper
+async function sha256(message) {
+  const encoder = new TextEncoder()
+  const data = encoder.encode(message)
+  const hash = await crypto.subtle.digest("SHA-256", data)
+  return Array.from(new Uint8Array(hash))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("")
+}
+
+// 2 - hmac helper
+async function hmac(key, message) {
+  const encoder = new TextEncoder()
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    typeof key === "string" ? encoder.encode(key) : key,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  )
+  return crypto.subtle.sign("HMAC", cryptoKey, encoder.encode(message))
+}
+
+// 3 - hmac hex helper
+async function hmacHex(key, message) {
+  const signature = await hmac(key, message)
+  return Array.from(new Uint8Array(signature))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("")
+}
+
+// 4 - signing key helper
+async function getSigningKey(secretKey, dateStamp, region, service) {
+  const kDate    = await hmac("AWS4" + secretKey, dateStamp)
+  const kRegion  = await hmac(kDate, region)
+  const kService = await hmac(kRegion, service)
+  const kSigning = await hmac(kService, "aws4_request")
+  return kSigning
+}
+
+// 5 - full request signer
+async function signAWSRequest({ method, endpoint, body, service, region, accessKeyId, secretAccessKey }) {
+  const url = new URL(endpoint)
+  const now = new Date()
+
+  const dateStamp = now.toISOString().slice(0, 10).replace(/-/g, "")
+  const timeStamp = now.toISOString().replace(/[:-]|\.\d{3}/g, "").slice(0, 15) + "Z"
+
+  const contentHash = await sha256(body)
+
+  const headers = {
+    "content-type": "application/json",
+    "host": url.hostname,
+    "x-amz-content-sha256": contentHash,
+    "x-amz-date": timeStamp
+  }
+
+  const canonicalHeaders = Object.entries(headers)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k}:${v}`)
+    .join("\n") + "\n"
+
+  const signedHeaders = Object.keys(headers).sort().join(";")
+
+  const canonicalRequest = [
+    method,
+    url.pathname,
+    "",
+    canonicalHeaders,
+    signedHeaders,
+    contentHash
+  ].join("\n")
+
+  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`
+
+  const stringToSign = [
+    "AWS4-HMAC-SHA256",
+    timeStamp,
+    credentialScope,
+    await sha256(canonicalRequest)
+  ].join("\n")
+
+  const signingKey = await getSigningKey(secretAccessKey, dateStamp, region, service)
+  const signature  = await hmacHex(signingKey, stringToSign)
+
+  headers["Authorization"] = [
+    `AWS4-HMAC-SHA256 Credential=${accessKeyId}/${credentialScope}`,
+    `SignedHeaders=${signedHeaders}`,
+    `Signature=${signature}`
+  ].join(", ")
+
+  return { headers }
+}
+
+// 6 - voice map
+function getPollyVoice(languageCode) {
+  const voices = {
+    en: { VoiceId: "Aria",    LanguageCode: "en-US",  Engine: "neural" },
+    es: { VoiceId: "Lupe",    LanguageCode: "es-US",  Engine: "neural" },
+    fr: { VoiceId: "Lea",     LanguageCode: "fr-FR",  Engine: "neural" },
+    de: { VoiceId: "Vicki",   LanguageCode: "de-DE",  Engine: "neural" },
+    zh: { VoiceId: "Zhiyu",   LanguageCode: "cmn-CN", Engine: "neural" },
+    ar: { VoiceId: "Hala",    LanguageCode: "arb",    Engine: "neural" },
+    hi: { VoiceId: "Kajal",   LanguageCode: "hi-IN",  Engine: "neural" },
+    pt: { VoiceId: "Camila",  LanguageCode: "pt-BR",  Engine: "neural" },
+    ja: { VoiceId: "Takumi",  LanguageCode: "ja-JP",  Engine: "neural" },
+    it: { VoiceId: "Bianca",  LanguageCode: "it-IT",  Engine: "neural" },
+    ko: { VoiceId: "Seoyeon", LanguageCode: "ko-KR",  Engine: "neural" }
+  }
+  return voices[languageCode] || voices.en
+}
+
+// 7 - main polly function
+async function speakWithPolly(text, language = "en") {
+  const config = await getConfig()
+  const voice  = getPollyVoice(language)
+
+  const endpoint = `https://polly.${config.awsRegion}.amazonaws.com/v1/speech`
+
+  const body = JSON.stringify({
+    Engine:       voice.Engine,
+    LanguageCode: voice.LanguageCode,
+    OutputFormat: "mp3",
+    Text:         text,
+    VoiceId:      voice.VoiceId
+  })
+
+  const signature = await signAWSRequest({
+    method:          "POST",
+    endpoint,
+    body,
+    service:         "polly",
+    region:          config.awsRegion,
+    accessKeyId:     config.awsAccessKeyId,
+    secretAccessKey: config.awsSecretAccessKey
+  })
+
+  const response = await fetch(endpoint, {
+    method:  "POST",
+    headers: signature.headers,
+    body
+  })
+
+  if (!response.ok) {
+    const err = await response.text()
+    throw new Error(`Polly error ${response.status}: ${err}`)
+  }
+
+  const audioBuffer = await response.arrayBuffer()
+  const base64 = btoa(
+    String.fromCharCode(...new Uint8Array(audioBuffer))
+  )
+  return `data:audio/mp3;base64,${base64}`
+}
+
+
+
+
+async function getSummary(text, userPrompt = "", mode, language) {
   const config = await getConfig();
   let instruction;
   const max_tokens = mode === "page" ? 1024 : 512;
+  const languageInstruction = language && language != 'en' ? `Respond entirelly in ${getLanguage(language)}. Everyword of your response must be in ${getLanguage(language)}`:""
   const voiceRule = `YOU ARE A TEXT-TO-SPEECH ENGINE. OUTPUT RULES - VIOLATION IS NOT ALLOWED:
 - NO markdown of any kind
 - NO headers or hashtags (#)
@@ -83,7 +273,7 @@ async function getSummary(text, userPrompt = "", mode) {
     instruction = selectionInstruction;
   }
 
-  const fullPrompt = `${instruction}\n\nText: ${text} \n\n Ignore any text that appears to be navigation menus, cookie notices, 
+  const fullPrompt = `${instruction}\n\n${languageInstruction}\n\nText: ${text} \n\n Ignore any text that appears to be navigation menus, cookie notices, 
     advertisements, or repeated footer content. Focus only on the main content of the page.`
 
 
@@ -159,10 +349,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   //receives message of text to summarize, calls the getSummary function which is async
   //so returns promise object, this is worked around by using .then() which waits for a 
   //value then performs another action 
-  console.log(`got message: ${message}`)
+  console.log("got message:", message, "language:", message.language)
   if (message.type === "GET_SUMMARY") {
     console.log("calling getSummary with:", message.text)
-    getSummary(message.text, message.prompt, message.mode).then((response) => {
+    getSummary(message.text, message.prompt, message.mode, message.language).then((response) => {
       console.log("summary ready:", response)
       sendResponse({ summary: response });
     }).catch(err => {

@@ -30,7 +30,8 @@
   ],
 
   "host_permissions": [
-    "https://api.anthropic.com/*"
+    "https://api.anthropic.com/*",
+    "https://polly.us-east-1.amazonaws.com/*"
   ],
 
   "browser_specific_settings": {
