@@ -15,14 +15,16 @@
 
 const btnSummarizePage  = document.getElementById("btn-summarize-page")
 const btnReadSelection  = document.getElementById("btn-read-selection")
-const userPrompt = document.getElementById("user-prompt")
-const btnPause = document.getElementById("btn-pause")
-const btnStop = document.getElementById("btn-stop")
-const speedSlider = document.getElementById("speed-slider")
-const statusText = document.getElementById("status-text")
-const summaryText = document.getElementById("summary-text")
-const summaryContainer = document.getElementById("summary-container")
-const toggleSummaryBtn = document.getElementById("toggle-summary")
+const userPrompt        = document.getElementById("user-prompt")
+const btnPause          = document.getElementById("btn-pause")
+const btnStop           = document.getElementById("btn-stop")
+const speedSlider       = document.getElementById("speed-slider")
+const languageSelect    = document.getElementById("language-select")
+const statusText        = document.getElementById("status-text")
+const summaryBox        = document.getElementById("summary-box")
+const summaryText       = document.getElementById("summary-text")
+const summaryContainer  = document.getElementById("summary-container")
+const toggleSummaryBtn  = document.getElementById("toggle-summary")
 
 
 //toggle go summary text
@@ -69,18 +71,17 @@ const getPageText = (id) => {
   return new Promise((resolve) => {
     chrome.tabs.sendMessage(
       id,
-      {type: "GET_PAGE_TEXT"},
-      (response) => {
-        resolve(response.text);
-      }
+      { type: "GET_PAGE_TEXT" },
+      (response) => { resolve(response.text) }
     )
   })
 }
+
 const getSelectedText = (id) => {
   return new Promise((resolve, reject) => {
     chrome.tabs.sendMessage(
       id,
-      {type: "GET_SELECTED_TEXT"},
+      { type: "GET_SELECTED_TEXT" },
       (response) => {
         if (chrome.runtime.lastError) {
           reject(chrome.runtime.lastError.message)
@@ -90,19 +91,26 @@ const getSelectedText = (id) => {
           reject("No response from content.js - is this a valid webpage?")
           return
         }
-        console.log("got selection:" + response.text);
-        resolve(response.text);
+        console.log("got selection:" + response.text)
+        resolve(response.text)
       }
     )
   })
 }
+
 const getSummaryFromBackground = (summaryText, userPrompt, mode) => {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage(
-      {type: "GET_SUMMARY", text: summaryText, prompt: userPrompt, mode: mode},
+      {
+        type: "GET_SUMMARY",
+        text: summaryText,
+        prompt: userPrompt,
+        mode: mode,
+        language: languageSelect.value  // ← language travels with every request
+      },
       (response) => {
-        console.log("got summary: " + response.summary);
-        resolve(response.summary);
+        console.log("got summary: " + response.summary)
+        resolve(response.summary)
       }
     )
   })
@@ -122,7 +130,6 @@ function stripMarkdown(text) {
 }
 
 
-
 // ─── BUTTON: SUMMARIZE FULL PAGE ─────────────────────────────────────────────
 // When clicked:
 //   1. Tell content.js to grab all the text on the current page
@@ -131,7 +138,6 @@ function stripMarkdown(text) {
 //   4. Pass the summary to speak()
 
 btnSummarizePage.addEventListener("click", async () => {
-
   setStatus("Reading page...")
 
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
@@ -165,9 +171,9 @@ btnSummarizePage.addEventListener("click", async () => {
       return
     }
 
-    const cleanSummary = stripMarkdown(summary);
+    const cleanSummary = stripMarkdown(summary)
     console.log("AI SUMMARY:", cleanSummary)
-    summaryText.textContent = summary;
+    summaryText.textContent = summary
     summaryContainer.classList.remove("hidden")
     toggleSummaryBtn.textContent = "Hide Summary"
     setStatus("Reading summary...")
@@ -181,9 +187,7 @@ btnSummarizePage.addEventListener("click", async () => {
     console.error("Summarize page error:", error)
     setStatus("Something went wrong: " + error)
   }
-
 })
-
 
 
 // ─── BUTTON: READ MY SELECTION ────────────────────────────────────────────────
@@ -193,11 +197,10 @@ btnSummarizePage.addEventListener("click", async () => {
 //   3. Get the summary back
 //   4. Pass the summary to speak()
 
+// Flow is identical to Summarize Page,
+// except content.js returns only highlighted text.
 
-//Flow is identical to Summarize Page,
-//except content.js returns only highlighted text.
 btnReadSelection.addEventListener("click", async () => {
-
   setStatus("Reading selection...")
 
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
@@ -231,9 +234,9 @@ btnReadSelection.addEventListener("click", async () => {
       return
     }
 
+    const cleanSummary = stripMarkdown(summary)
     console.log("AI SUMMARY:", summary)
     summaryText.textContent = summary
-    const cleanSummary = stripMarkdown(summary)
     summaryContainer.classList.remove("hidden")
     toggleSummaryBtn.textContent = "Hide Summary"
     setStatus("Reading summary...")
@@ -247,7 +250,6 @@ btnReadSelection.addEventListener("click", async () => {
     console.error("Read selection error:", error)
     setStatus("Something went wrong: " + error)
   }
-
 })
 
 
@@ -272,7 +274,6 @@ btnPause.addEventListener("click", () => {
 
 // ─── BUTTON: STOP ────────────────────────────────────────────────────────────
 // Stop reading entirely and reset
-
 
 btnStop.addEventListener("click", () => {
   btnPause.textContent = "Pause"
