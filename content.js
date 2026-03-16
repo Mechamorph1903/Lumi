@@ -30,6 +30,32 @@ console.log("CONTENT SCRIPT LOADED")
 let currentRate = 1    // tracks speed set by slider; updated by SET_SPEED messages
 let lastUtteranceText = ""  // saved so SET_SPEED can restart at new rate
 let speakTimer = null  // guards against rapid-fire speak() calls
+let currentAudio = null  // tracks Polly audio element for controls
+let audioQueue = []
+
+
+//plays queue of audio urls in sequenece to bypass aws polly 3000 character limit
+function playNextInQueue() {
+  if (audioQueue.length === 0) {
+    currentAudio = null
+    return
+  }
+
+  const url = audioQueue.shift()
+  currentAudio = new Audio(url)
+  currentAudio.playbackRate = currentRate
+
+  currentAudio.onerror = (e) => {
+    console.error("Audio error:", e)
+    playNextInQueue()  // skip broken chunk and continue
+  }
+
+  currentAudio.onended = () => {
+    playNextInQueue()  // play next chunk when this one finishes
+  }
+
+  currentAudio.play()
+}
 
 // Voices load asynchronously — cache them once they're ready
 let cachedVoices = []
@@ -78,7 +104,14 @@ function speak(text, rate = currentRate) {
 }
 
 function pauseSpeech() {
-  // Toggle: pause if speaking, resume if already paused
+  if (currentAudio && !currentAudio.paused) {
+    currentAudio.pause()
+    return
+  }
+  if (currentAudio && currentAudio.paused) {
+    currentAudio.play()
+    return
+  }
   if (window.speechSynthesis.paused) {
     window.speechSynthesis.resume()
   } else if (window.speechSynthesis.speaking) {
@@ -87,7 +120,18 @@ function pauseSpeech() {
 }
 
 function stopSpeech() {
-  // Cancel any pending delayed speak() call so Stop is reliable
+  audioQueue = []  // clear queue so next chunk doesn't auto-play
+  if (currentAudio) {
+    currentAudio.pause()
+    currentAudio.currentTime = 0
+    currentAudio = null
+  }
+  if (speakTimer) {
+    clearTimeout(speakTimer)
+    speakTimer = null
+  }
+  window.speechSynthesis.cancel()
+  // fallback: Cancel any pending delayed speak() call so Stop is reliable
   if (speakTimer) {
     clearTimeout(speakTimer)
     speakTimer = null
@@ -133,13 +177,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   // ── SPEECH COMMANDS (forwarded here from background.js) ──
+  if (message.type === "PLAY_AUDIO_QUEUE") {
+    audioQueue = [...message.urls]  // load all chunks into queue
+    if (currentAudio) {
+      currentAudio.pause()
+      currentAudio = null
+    }
+    playNextInQueue()  // start playing
+    sendResponse({ ok: true })
+  }
+  if (message.type === "PLAY_AUDIO_URL"){
+    audioQueue = [message.url]
+    if (currentAudio) {
+      currentAudio.pause()
+      currentAudio = null
+    }
+    playNextInQueue()
+    sendResponse({ ok: true })
+  }
+
+  //OLD COMMANDS (FALLBACK WHEN POLLY FAILS)
   if (message.type === "PLAY_SPEECH") {
-    console.log("content.js received PLAY_SPEECH, speaking:", message.text.substring(0, 50))
+    console.log("content.js received fallback PLAY_SPEECH, speaking:", message.text.substring(0, 50))
     speak(message.text)
     sendResponse({ ok: true })
   }
 
   if (message.type === "PAUSE_SPEECH") {
+    
     pauseSpeech()
     sendResponse({ ok: true })
   }
@@ -151,11 +216,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === "SET_SPEED") {
     currentRate = message.rate
-    // If speech is active, restart it at the new speed
-    if (window.speechSynthesis.speaking) {
-      const remaining = lastUtteranceText
-      if (remaining) speak(remaining, currentRate)
+
+    if (currentAudio) {
+      currentAudio.playbackRate = currentRate
     }
+
+    // fallback: If speech is active, restart it at the new speed
+    // if (window.speechSynthesis.speaking) {
+    //   const remaining = lastUtteranceText
+    //   if (remaining) speak(remaining, currentRate)
+    // }
     sendResponse({ ok: true })
   }
 
@@ -246,8 +316,11 @@ document.addEventListener("mouseup", (event) => {
       if (!aiResponse || !aiResponse.summary) return
 
       // Read the summary aloud
-      speak(aiResponse.summary)
-
+      chrome.runtime.sendMessage({
+          type: "PLAY_SPEECH",
+          text: aiResponse.summary,
+          language: "en"  // floating button uses default language
+        })
     })
 
     // Remove the floating button after it is used
