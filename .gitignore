@@ -22,3 +22,6 @@ __pycache__/
 # Build artifacts
 *.zip
 *.crx
+
+#claude
+.claude/
