@@ -172,6 +172,63 @@ button:focus {
 #audio-controls {
   margin-top: 12px;
 }
+
+/* ── PROGRESS BAR + TIME ─────────────────────────────────────────────────── */
+#progress-section {
+  margin-bottom: 10px;
+}
+
+#progress-bar {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: #333;
+  outline: none;
+  cursor: pointer;
+  margin: 0;
+}
+
+#progress-bar::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #2d7ff9;
+  cursor: pointer;
+  border: 2px solid #111;
+}
+
+#progress-bar::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #2d7ff9;
+  cursor: pointer;
+  border: 2px solid #111;
+}
+
+#progress-bar::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+}
+
+#progress-bar:focus {
+  outline: 2px solid #ffd54f;
+}
+
+#time-display {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #999;
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── TRANSPORT BUTTONS ────────────────────────────────────────────────────── */
 /* Pause + Stop row */
 #speech-buttons {
   display: flex;
@@ -180,6 +237,8 @@ button:focus {
 }
 #speech-buttons button {
   flex: 1;
+  font-size: 13px;
+  padding: 8px 6px;
 }
 /* Speed section */
 #speed-control label {
