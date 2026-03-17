@@ -43,6 +43,7 @@ let playerIsPlaying = false  // True when audio is actively playing
 let playerIsPaused = false   // True when paused mid-playback
 let progressInterval = null  // Timer that reports progress to popup
 
+
 // Loads all audio chunk URLs, pre-loads them to get durations, wires up
 // auto-advance so chunks play seamlessly one after another.
 function loadAudioChunks(urls) {

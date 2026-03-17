@@ -32,7 +32,10 @@ function getLanguage(code){
     pt: "Portuguese",
     hi: "Hindi",
     ko: "Korean",
-    it: "Italian"
+    it: "Italian",
+    hip: "Hip Mode",
+    blk: "BLK Mode",
+    xd: "XD Mode"
   }
 
   return langs[code] || "English"
@@ -133,9 +136,9 @@ async function signAWSRequest({ method, endpoint, body, service, region, accessK
 }
 
 // 6 - voice map
-function getPollyVoice(languageCode) {
+function getPollyVoice(languageCode, vibeCode) {
   const voices = {
-    en: { VoiceId: "Gregory",    LanguageCode: "en-US",  Engine: "neural" },
+    en: { VoiceId: "Danielle",    LanguageCode: "en-US",  Engine: "neural" },
     es: { VoiceId: "Lupe",    LanguageCode: "es-US",  Engine: "neural" },
     fr: { VoiceId: "Liam",     LanguageCode: "fr-CA",  Engine: "neural" },
     de: { VoiceId: "Vicki",   LanguageCode: "de-DE",  Engine: "neural" },
@@ -145,16 +148,22 @@ function getPollyVoice(languageCode) {
     pt: { VoiceId: "Camila",  LanguageCode: "pt-BR",  Engine: "neural" },
     ja: { VoiceId: "Takumi",  LanguageCode: "ja-JP",  Engine: "neural" },
     it: { VoiceId: "Adriano",  LanguageCode: "it-IT",  Engine: "neural" },
-    ko: { VoiceId: "Seoyeon", LanguageCode: "ko-KR",  Engine: "neural" }
+    ko: { VoiceId: "Seoyeon", LanguageCode: "ko-KR",  Engine: "neural" },
+    hip: { VoiceId: "Danielle",    LanguageCode: "en-US",  Engine: "neural" },
+    xd: { VoiceId: "Joey",    LanguageCode: "en-US",  Engine: "neural" },
+    blk: { VoiceId: "Gregory",    LanguageCode: "en-US",  Engine: "neural" }
   }
-  console.log(`I was given this lang code: ${languageCode}`);
+
+  if (vibeCode != "" && languageCode === "en"){
+    return voices[vibeCode]
+  }
   return voices[languageCode] || voices.en
 }
 
 // 7 - main polly function
-async function speakWithPolly(text, language = "en") {
+async function speakWithPolly(text, language = "en", vibe="") {
   const config = await getConfig()
-  const voice  = getPollyVoice(language)
+  const voice  = getPollyVoice(language, vibe)
 
   // split text into chunks under 2800 chars
   // split on sentence boundaries so speech sounds natural
@@ -268,11 +277,12 @@ async function pollySingleChunk(text, voice, config) {
 
 
 
-async function getSummary(text, userPrompt = "", mode, language) {
+async function getSummary(text, userPrompt = "", mode, language, vibe = "") {
   const config = await getConfig();
   let instruction;
   const max_tokens = mode === "page" ? 1024 : 512;
-  const languageInstruction = language && language != 'en' ? `Respond entirelly in ${getLanguage(language)}. Everyword of your response must be in ${getLanguage(language)}`:""
+
+
   const voiceRule = `YOU ARE A TEXT-TO-SPEECH ENGINE. OUTPUT RULES - VIOLATION IS NOT ALLOWED:
 - NO markdown of any kind
 - NO headers or hashtags (#)
@@ -280,9 +290,72 @@ async function getSummary(text, userPrompt = "", mode, language) {
 - NO bold or asterisks (**)
 - NO tables
 - NO numbered lists
-- NO special characters
 - ONLY plain sentences — in whatever language is specified above
-- If you use any formatting, you have failed your only job`
+- [IMPORTANT] PUNCTUATION IS ALLOWED AND ENCOURAGED: periods, commas, question marks, 
+  exclamation marks, quotation marks, apostrophes, ellipses (...), em dash, hyphens
+  These help the speech sound natural — use them freely!
+- If you use any formatting symbols, you have failed your only job`
+
+
+
+  const xdInstruction = `${voiceRule}
+     Now write your response in the voice of a hyped American dude deep in extreme sports culture.
+     Think dirtbikes, monster trucks, motocross, Red Bull, energy drinks, getting air.
+     
+     TONE: Loud, enthusiastic, zero filter. Like you just landed a sick jump and need to explain something.
+     
+     VOCABULARY TO USE: dude, bro, gnarly, sick, shred, send it, no cap, straight up, legit, 
+     that slaps, wild, insane, banger, lowkey ripping, fire, let's gooo, deadass, 
+     "not gonna lie", "for real for real", "that's actually hard"
+     
+     SENTENCE STYLE:
+     - Short punchy sentences. Lots of emphasis.
+     - Start with something like "Okay bro so—", "Dude straight up—", "Ngl this is kinda wild—"
+     - Break complex things down like you're explaining to your boy at the track
+     - Random hype interjections are fine — "which is INSANE", "bro what", "no way that's real"
+     - Punctuation, if you have slang that act as an introductory word use apopropriate punctutation, remember you are a TTS reader
+     
+     WHAT TO AVOID:
+     - Never sound like a textbook
+     - Never use formal transitions like "furthermore" or "in conclusion"
+     - Don't overdo it — one or two slang words per sentence is enough, not every single word
+     
+     Keep it PG. The energy is high school energy not adult content.
+
+  ${voiceRule}`
+
+  const hipInstruction = `${voiceRule}
+Role: You are a bubbly, expressive, and trend-savvy best friend. Think brunch energy.
+Task: Break down this page content so it feels approachable, fun, and "essential."
+
+Guidelines:
+- Structure: Open with "Okay, so here's the tea." Use emojis sparingly to highlight key points. Summarize the "vibe" of the article first.
+- Logic: Use "relatable" analogies (skincare, social trends, or life-hacks) to explain complex data. 
+- Vocabulary: "Literally," "it’s giving," "totally," "kind of like," "honestly," "bestie," "the way that."
+- No-Go: Don't be dry. If the content is boring, acknowledge it ("I know this sounds dry, but...").
+- Goal: Make the user feel like they’re getting the inside scoop from a friend who already did the reading for them.
+- Punctuation, if you have slang that act as an introductory word use apopropriate punctutation, remember you are a TTS reader
+Example: "Okay so basically what this is saying is totally [Content]. It’s giving [Vibe]..."
+${voiceRule}`
+
+  const blkInstruction = `${voiceRule}
+    Role: You are providing a grounded, direct summary using AAVE. You are the "smart homie" who cuts through the noise.
+    Task: Summarize the page content with clarity, rhythm, and zero fluff.
+
+    Guidelines:
+    - Structure: Start with "So check it" or "Look." Use a "Major Keys" section for the most important takeaways. 
+    - Logic: Prioritize the "bottom line." Explain why this information matters to the average person. Be smart but never stiff.
+    - Vocabulary: "Lowkey," "no cap," "for real though," "what's happening here is," "on sight," "facts."
+    - No-Go: Avoid forced slang or stereotypes. Keep the flow natural and the intelligence high. 
+    - Goal: Provide a version of the text that feels honest, respected, and easy to digest.
+    - Punctuation, if you have slang that act as an introductory word use apopropriate punctutation, remember you are a TTS reader
+
+    Example: "Yo, so basically what’s going on here is [Content]. For real though, the main thing you need to know is..."
+    ${voiceRule}`
+
+  const vibeInstruction = vibe === "xd" ? xdInstruction : vibe === "hip" ? hipInstruction : vibe === "blk" ? blkInstruction: "";
+
+  const languageInstruction = language && language != 'en' ? `Respond entirelly in ${getLanguage(language)}. Everyword of your response must be in ${getLanguage(language)}.`:""
 
   const fullPageInstruction = `${voiceRule}
 
@@ -308,6 +381,7 @@ async function getSummary(text, userPrompt = "", mode, language) {
   The user has a specific question about this text: "${userPrompt}"
   Answer it directly in plain spoken language.
   If the question cannot be answered from the text alone, say so honestly.
+  Be lenient if the user asks questions in slang such as, "what's the tea?". It does not necessarily mean you should find the instruction in the provided text
 
   ${voiceRule}`
 
@@ -319,7 +393,7 @@ async function getSummary(text, userPrompt = "", mode, language) {
     instruction = selectionInstruction;
   }
 
-  const fullPrompt = `${languageInstruction}\n\n${instruction}\n\nText: ${text} \n\n Ignore any text that appears to be navigation menus, cookie notices, 
+  const fullPrompt = `${languageInstruction}\n\n${vibeInstruction}\n\n${instruction}\n\nText: ${text} \n\n Ignore any text that appears to be navigation menus, cookie notices, 
     advertisements, or repeated footer content. Focus only on the main content of the page.`
 
 
@@ -392,11 +466,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   //receives message of text to summarize, calls the getSummary function which is async
   //so returns promise object, this is worked around by using .then() which waits for a 
   //value then performs another action 
-  console.log("got message:", message, "language:", message.language)
   if (message.type === "GET_SUMMARY") {
-    console.log("calling getSummary with:", message.text)
-    getSummary(message.text, message.prompt, message.mode, message.language).then((response) => {
-      console.log("summary ready:", response)
+    getSummary(message.text, message.prompt, message.mode, message.language, message.vibe).then((response) => {
       sendResponse({ summary: response });
     }).catch(err => {
         console.error("Claude error:", err)
@@ -407,7 +478,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === "PLAY_SPEECH") {
     console.log("background received PLAY_SPEECH, calling Polly...")
-    speakWithPolly(message.text, message.language)
+    speakWithPolly(message.text, message.language, message.vibe)
       .then(audioDataUrls => {
         forwardToActiveTab({ type: "STOP_SPEECH" })
         setTimeout(() => {

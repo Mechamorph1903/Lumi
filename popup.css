@@ -355,6 +355,44 @@ button:focus {
   outline: 2px solid #ffd54f;
   border-color: transparent;
 }
+#vibe-control {
+  margin-top: 12px;
+}
+
+#vibe-control label {
+  display: block;
+  font-size: 12px;
+  color: #aaaaaa;
+  margin-bottom: 4px;
+}
+
+#vibe-select {
+  width: 100%;
+  padding: 8px 10px;
+  background-color: #1e1e1e;
+  color: #f5f5f5;
+  border: 1px solid #444;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+
+  /* Remove the default OS-styled arrow, add a custom one */
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23aaaaaa' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 30px;
+}
+
+#vibe-select:hover {
+  border-color: #2d7ff9;
+}
+
+#vibe-select:focus {
+  /* Same focus ring style as your buttons — consistency matters for a11y */
+  outline: 2px solid #ffd54f;
+  border-color: transparent;
+}
 
 
 

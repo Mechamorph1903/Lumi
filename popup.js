@@ -26,6 +26,8 @@ const toggleSummaryBtn  = document.getElementById("toggle-summary")
 const progressBar       = document.getElementById("progress-bar")
 const timeCurrent       = document.getElementById("time-current")
 const timeTotal         = document.getElementById("time-total")
+const vibeSelect        = document.getElementById("vibe-select")
+const SKIP_SECONDS      = 10  // how many seconds to jump on rewind / fast-forward
 
 //language last used
 chrome.storage.local.get("lumiLanguage", (result) => {
@@ -58,8 +60,15 @@ chrome.storage.local.get("lumiInput", (result) => {
 userPrompt.addEventListener("focusout", () => {
   chrome.storage.local.set({ lumiInput: userPrompt.value })
 })
+//vibe last chosen
+chrome.storage.local.get("lumiVibe", (result) => {
+  if (result.lumiVibe) vibeSelect.value = result.lumiVibe
+})
+//save vibe last used
+vibeSelect.addEventListener("change", () => {
+  chrome.storage.local.set({ lumiVibe: vibeSelect.value })
+})
 
-const SKIP_SECONDS = 10  // how many seconds to jump on rewind / fast-forward
 
 
 // ─── TIME FORMATTING HELPER ──────────────────────────────────────────────────
@@ -219,7 +228,8 @@ const getSummaryFromBackground = (summaryText, userPrompt, mode) => {
         text: summaryText,
         prompt: userPrompt,
         mode: mode,
-        language: languageSelect.value
+        language: languageSelect.value,
+        vibe: vibeSelect.value
       },
       (response) => {
         console.log("got summary: " + response.summary)
@@ -281,7 +291,8 @@ btnSummarizePage.addEventListener("click", async () => {
     chrome.runtime.sendMessage({
       type: "PLAY_SPEECH",
       text: summary,
-      language: languageSelect.value
+      language: languageSelect.value,
+      vibe: vibeSelect.value
     })
 
   } catch (error) {
@@ -340,7 +351,8 @@ btnReadSelection.addEventListener("click", async () => {
     chrome.runtime.sendMessage({
       type: "PLAY_SPEECH",
       text: summary,
-      language: languageSelect.value
+      language: languageSelect.value,
+      vibe: vibeSelect.value
     })
 
   } catch (error) {
