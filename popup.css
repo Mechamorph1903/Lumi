@@ -16,10 +16,10 @@
 body {
   width: 320px;         /* Chrome popup fixed width */
   min-height: 200px;
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Raleway', sans-serif;
   font-size: 14px;
   /* TODO: choose your color scheme */
-  background-color: #111;
+  background-color: #3B1F6B;
   color: #f5f5f5 ;
   padding: 16px;
 }
@@ -33,6 +33,9 @@ header h1 {
   font-size: 20px;
   font-weight: bold;
   margin-bottom: 2px;
+  font-family: 'Cinzel', serif;
+  letter-spacing: 3px;
+
   /* TODO */
 }
 header p {
@@ -78,18 +81,18 @@ button {
   cursor: pointer;
   font-size: 14px;
   font-weight: bold;
-  background-color: #2d7ff9;
+  background-color: #FF7043;
   color: white;
   transition: background-color 0.2s ease;
   /* TODO: background and text colors */
 }
 button:hover {
-    background-color: #1a66d9;
+    background-color: #CE93D8;
   /* TODO: slightly lighter or darker on hover */
 }
 button:focus {
   /* TODO: visible focus ring - never remove focus outlines for accessibility */
-    outline: 2px solid #ffd54f;
+    outline: 2px solid #CE93D8;
 }
 /* ── STATUS TEXT ──────────────────────────────────────────────────────────── */
 #status-text {
@@ -176,18 +179,27 @@ button:focus {
 /* ── PROGRESS BAR + TIME ─────────────────────────────────────────────────── */
 #progress-section {
   margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
 }
 
 #progress-bar {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 6px;
-  border-radius: 3px;
-  background: #333;
+  height: 14px; /* gives the thumb room to sit centered */
+  background: transparent;
   outline: none;
   cursor: pointer;
   margin: 0;
+  accent-color: #FF7043;
+}
+
+#progress-bar::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background: #5A3A8D; /* body-themed track */
 }
 
 #progress-bar::-webkit-slider-thumb {
@@ -195,28 +207,34 @@ button:focus {
   appearance: none;
   width: 14px;
   height: 14px;
+  margin-top: -4px; /* centers thumb on 6px track */
   border-radius: 50%;
-  background: #2d7ff9;
+  background: #FF7043;
+  border: 2px solid #3B1F6B;
   cursor: pointer;
-  border: 2px solid #111;
+}
+
+#progress-bar::-webkit-slider-thumb:hover {
+  transform: scale(1.08);
+}
+
+#progress-bar::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: #5A3A8D;
 }
 
 #progress-bar::-moz-range-thumb {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #2d7ff9;
+  background: #FF7043;
+  border: 2px solid #3B1F6B;
   cursor: pointer;
-  border: 2px solid #111;
-}
-
-#progress-bar::-webkit-slider-runnable-track {
-  height: 6px;
-  border-radius: 3px;
 }
 
 #progress-bar:focus {
-  outline: 2px solid #ffd54f;
+  outline: 2px solid #CE93D8;
 }
 
 #time-display {
@@ -247,9 +265,49 @@ button:focus {
   color: #aaaaaa;
 }
 #speed-slider {
+  -webkit-appearance: none;
+  appearance: none;
   width: 100%;
+  height: 14px;
   margin-top: 4px;
   cursor: pointer;
+  background: transparent;
+  accent-color: #FF7043;
+}
+
+#speed-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background: #5A3A8D; /* matches body palette */
+}
+
+#speed-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: #FF7043; /* accent */
+  border: 2px solid #3B1F6B;
+}
+
+#speed-slider::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: #5A3A8D;
+}
+
+#speed-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #FF7043;
+  border: 2px solid #3B1F6B;
+}
+
+#speed-slider:focus {
+  outline: 2px solid #CE93D8;
 }
 
 /* ── LANGUAGE SELECTOR ───────────────────────────────────────────────────── */
@@ -323,5 +381,5 @@ button:focus {
 }
 #toggle-summary {
   margin-top: 8px;
-}      
+}
 

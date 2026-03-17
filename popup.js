@@ -368,11 +368,11 @@ btnPlayPause.addEventListener("click", () => {
   isPaused = !isPaused
 
   if (isPaused) {
-    btnPlayPause.textContent = "▶"
+    btnPlayPause.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><title>Play-filled-alt SVG Icon</title><path fill="currentColor" d="M7 28a1 1 0 0 1-1-1V5a1 1 0 0 1 1.482-.876l20 11a1 1 0 0 1 0 1.752l-20 11A1 1 0 0 1 7 28"/></svg>`
     btnPlayPause.dataset.state = "paused"
     setStatus("Paused.")
   } else {
-    btnPlayPause.textContent = "⏸"
+    btnPlayPause.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><title>Pause-filled SVG Icon</title><path fill="currentColor" d="M12 6h-2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2m10 0h-2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2"/></svg>`
     btnPlayPause.dataset.state = "playing"
     setStatus("Resuming...")
   }
@@ -419,7 +419,6 @@ speedSlider.addEventListener("input", () => {
 
 // ─── TALKING TO OTHER FILES ───────────────────────────────────────────────────
 // This is how popup.js sends messages to background.js or content.js
-// You'll use this pattern a lot - study it carefully
 //
 // chrome.runtime.sendMessage(
 //   { type: "GET_SUMMARY", text: "some text here" },
