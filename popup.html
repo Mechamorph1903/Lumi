@@ -54,8 +54,9 @@
       <div id="audio-controls">
 
         <div id="speech-buttons">
-          <button id="btn-pause">Pause</button>
-          <button id="btn-stop">Stop</button>
+          <button id="btn-rewind">Rewind</button>
+          <button id="btn-play-pause" data-state="playing">Pause</button>
+          <button id="btn-fastfwd">Fast Fwd</button>
         </div>
 
         <div id="speed-control">
@@ -87,11 +88,13 @@
       </div>
       </div>
 
-      <button id="toggle-summary">Show Summary</button>
+      <div id="summary-box" hidden>
+        <button id="toggle-summary">Show Summary</button>
         <div id="summary-container" class="hidden">
           <h3>Summary</h3>
           <p id="summary-text"></p>
         </div>
+      </div>
 
     </main>
 
