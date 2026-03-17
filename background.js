@@ -1,16 +1,3 @@
-// background.js
-// This is the silent brain of the extension.
-// It runs in the background even when the popup is closed.
-//
-// Its one job:
-//   Receive text from popup.js, call the Claude API, return the summary
-//
-// Why here and not in popup.js?
-//   Because Manifest V3 restricts where external API calls can be made.
-//   background.js (the service worker) is the safe place for fetch() calls.
-//
-// It talks to popup.js using chrome.runtime.onMessage.addListener()
-
 // ─── LOAD API KEY FROM CONFIG ─────────────────────────────────────────────────
 // fetch() works identically in Chrome service workers and Firefox background
 // scripts — no import compatibility issues.  config.json is gitignored.

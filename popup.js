@@ -1,5 +1,4 @@
 // popup.js
-// This file controls everything you see in the popup panel.
 // Its three jobs:
 //   1. Listen for button clicks from popup.html
 //   2. Ask content.js for text from the current webpage
@@ -11,7 +10,6 @@
 
 
 // ─── GRAB THE HTML ELEMENTS WE NEED TO CONTROL ───────────────────────────────
-// These match the id="" values in popup.html
 
 const btnSummarizePage  = document.getElementById("btn-summarize-page")
 const btnReadSelection  = document.getElementById("btn-read-selection")

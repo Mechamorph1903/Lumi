@@ -44,12 +44,12 @@
 
       <!-- STATUS INDICATOR -->
       <!-- This text updates to tell the user what's happening -->
-      <!-- States: idle / thinking / reading / done / error -->
+     
 
       <p id="status-text">Ready</p>
       <!-- AUDIO CONTROLS -->
-      <!-- These control the Web Speech API playback -->
-      <!-- They should probably be hidden until a summary is being read -->
+      <!-- These control the POLLY playback -->
+    
 
       <div id="audio-controls">
 
@@ -104,11 +104,6 @@
 
     </main>
 
-    <!--
-      popup.js is loaded here at the bottom of the body.
-      It handles all button clicks and updates this HTML.
-      It also talks to background.js which handles the Claude API call.
-    -->
     <script src="popup.js"></script>
 
   </body>

@@ -130,4 +130,5 @@ The extension requires the following permissions:
 - Vanilla JavaScript (no build step required)
 - Extensions Manifest V3 (Chrome + Firefox)
 - Anthropic Claude API (`claude-haiku-4-5-20251001`)
+- AWS Polly (naturalistic converstaional TTS API)
 - Web Speech API (browser-native text-to-speech)
