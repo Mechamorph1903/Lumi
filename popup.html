@@ -53,9 +53,18 @@
 
       <div id="audio-controls">
 
+        <div id="progress-section">
+          <input type="range" id="progress-bar" min="0" max="100" step="0.1" value="0" />
+          <div id="time-display">
+            <span id="time-current">0:00</span>
+            <span id="time-total">0:00</span>
+          </div>
+        </div>
+
         <div id="speech-buttons">
-          <button id="btn-pause">Pause</button>
-          <button id="btn-stop">Stop</button>
+          <button id="btn-rewind" title="Rewind 10s">&#9194; 10s</button>
+          <button id="btn-play-pause" data-state="playing" title="Play / Pause">&#9208;</button>
+          <button id="btn-fastfwd" title="Fast Forward 10s">10s &#9193;</button>
         </div>
 
         <div id="speed-control">
@@ -88,10 +97,10 @@
       </div>
 
       <button id="toggle-summary">Show Summary</button>
-        <div id="summary-container" class="hidden">
-          <h3>Summary</h3>
-          <p id="summary-text"></p>
-        </div>
+      <div id="summary-container" class="hidden">
+        <h3>Summary</h3>
+        <p id="summary-text"></p>
+      </div>
 
     </main>
 

@@ -30,30 +30,232 @@ console.log("CONTENT SCRIPT LOADED")
 let currentRate = 1    // tracks speed set by slider; updated by SET_SPEED messages
 let lastUtteranceText = ""  // saved so SET_SPEED can restart at new rate
 let speakTimer = null  // guards against rapid-fire speak() calls
-let currentAudio = null  // tracks Polly audio element for controls
+
+// ─── SEEKABLE AUDIO PLAYER ENGINE ─────────────────────────────────────────────
+// Spotify/YouTube-style: pre-loads all audio chunks, tracks total duration,
+// supports seeking to any position, and reports progress back to the popup.
+
+let audioElements = []       // Pre-loaded Audio objects for each chunk
+let chunkDurations = []      // Duration (seconds) of each chunk
+let totalDuration = 0        // Sum of all chunk durations
+let currentChunkIndex = 0    // Which chunk is currently playing
+let playerIsPlaying = false  // True when audio is actively playing
+let playerIsPaused = false   // True when paused mid-playback
+let progressInterval = null  // Timer that reports progress to popup
+
+// Loads all audio chunk URLs, pre-loads them to get durations, wires up
+// auto-advance so chunks play seamlessly one after another.
+function loadAudioChunks(urls) {
+  return new Promise((resolve, reject) => {
+    // Clean up any previous playback
+    destroyPlayer()
+
+    let loadedCount = 0
+    const total = urls.length
+
+    urls.forEach((url, i) => {
+      const audio = new Audio()
+      audio.preload = "auto"
+
+      audio.addEventListener("loadedmetadata", () => {
+        chunkDurations[i] = audio.duration
+        loadedCount++
+        if (loadedCount === total) {
+          totalDuration = chunkDurations.reduce((sum, d) => sum + d, 0)
+          console.log(`Audio player: ${total} chunks loaded, total ${totalDuration.toFixed(1)}s`)
+          resolve()
+        }
+      })
+
+      audio.addEventListener("error", (e) => {
+        console.error(`Audio chunk ${i} failed to load:`, e)
+        chunkDurations[i] = 0
+        loadedCount++
+        if (loadedCount === total) {
+          totalDuration = chunkDurations.reduce((sum, d) => sum + d, 0)
+          resolve()
+        }
+      })
+
+      audio.addEventListener("ended", () => {
+        if (currentChunkIndex < audioElements.length - 1) {
+          // Advance to next chunk
+          currentChunkIndex++
+          const next = audioElements[currentChunkIndex]
+          next.currentTime = 0
+          next.playbackRate = currentRate
+          next.play()
+        } else {
+          // All chunks finished
+          playerIsPlaying = false
+          playerIsPaused = false
+          stopProgressReporting()
+          reportProgress()  // final update
+        }
+      })
+
+      audio.src = url
+      audioElements[i] = audio
+    })
+
+    if (total === 0) {
+      resolve()
+    }
+  })
+}
+
+// Tears down the player completely
+function destroyPlayer() {
+  stopProgressReporting()
+  audioElements.forEach(a => {
+    a.pause()
+    a.removeAttribute("src")
+    a.load()  // release resources
+  })
+  audioElements = []
+  chunkDurations = []
+  totalDuration = 0
+  currentChunkIndex = 0
+  playerIsPlaying = false
+  playerIsPaused = false
+}
+
+// Start playing from the current chunk/position
+function playerPlay() {
+  if (audioElements.length === 0) return
+  const audio = audioElements[currentChunkIndex]
+  audio.playbackRate = currentRate
+  audio.play()
+  playerIsPlaying = true
+  playerIsPaused = false
+  startProgressReporting()
+}
+
+// Pause at current position
+function playerPause() {
+  if (!playerIsPlaying) return
+  const audio = audioElements[currentChunkIndex]
+  audio.pause()
+  playerIsPaused = true
+  playerIsPlaying = false
+  stopProgressReporting()
+  reportProgress()
+}
+
+// Toggle pause/resume
+function playerTogglePause() {
+  if (playerIsPaused) {
+    playerPlay()
+  } else if (playerIsPlaying) {
+    playerPause()
+  }
+}
+
+// Stop and reset to beginning
+function playerStop() {
+  if (audioElements.length === 0) return
+  audioElements[currentChunkIndex].pause()
+  audioElements.forEach(a => { a.currentTime = 0 })
+  currentChunkIndex = 0
+  playerIsPlaying = false
+  playerIsPaused = false
+  stopProgressReporting()
+  reportProgress()
+}
+
+// Get current playback position in seconds across all chunks
+function getPlayerCurrentTime() {
+  let elapsed = 0
+  for (let i = 0; i < currentChunkIndex; i++) {
+    elapsed += (chunkDurations[i] || 0)
+  }
+  if (audioElements[currentChunkIndex]) {
+    elapsed += audioElements[currentChunkIndex].currentTime
+  }
+  return elapsed
+}
+
+// Seek to an absolute time (seconds) across all chunks
+function playerSeekTo(time) {
+  if (audioElements.length === 0 || totalDuration === 0) return
+
+  // Clamp to valid range
+  time = Math.max(0, Math.min(time, totalDuration - 0.01))
+
+  const wasPlaying = playerIsPlaying
+
+  // Pause current chunk
+  if (audioElements[currentChunkIndex]) {
+    audioElements[currentChunkIndex].pause()
+  }
+
+  // Find the target chunk and offset
+  let accumulated = 0
+  for (let i = 0; i < chunkDurations.length; i++) {
+    if (accumulated + chunkDurations[i] > time || i === chunkDurations.length - 1) {
+      currentChunkIndex = i
+      audioElements[i].currentTime = time - accumulated
+      audioElements[i].playbackRate = currentRate
+
+      if (wasPlaying) {
+        audioElements[i].play()
+        playerIsPlaying = true
+      }
+      reportProgress()
+      return
+    }
+    accumulated += chunkDurations[i]
+  }
+}
+
+// Reports current playback state back to the popup/background
+function reportProgress() {
+  const state = {
+    type: "PLAYBACK_PROGRESS",
+    currentTime: getPlayerCurrentTime(),
+    totalDuration: totalDuration,
+    isPlaying: playerIsPlaying,
+    isPaused: playerIsPaused,
+    chunkIndex: currentChunkIndex,
+    totalChunks: audioElements.length
+  }
+  chrome.runtime.sendMessage(state).catch(() => {
+    // popup may be closed — ignore
+  })
+}
+
+function startProgressReporting() {
+  stopProgressReporting()
+  progressInterval = setInterval(reportProgress, 250)
+}
+
+function stopProgressReporting() {
+  if (progressInterval) {
+    clearInterval(progressInterval)
+    progressInterval = null
+  }
+}
+
+// ─── LEGACY QUEUE COMPAT ──────────────────────────────────────────────────────
+// Kept for the fallback browser-voice path which doesn't need seeking.
+let currentAudio = null
 let audioQueue = []
 
-
-//plays queue of audio urls in sequenece to bypass aws polly 3000 character limit
 function playNextInQueue() {
   if (audioQueue.length === 0) {
     currentAudio = null
     return
   }
-
   const url = audioQueue.shift()
   currentAudio = new Audio(url)
   currentAudio.playbackRate = currentRate
-
   currentAudio.onerror = (e) => {
     console.error("Audio error:", e)
-    playNextInQueue()  // skip broken chunk and continue
+    playNextInQueue()
   }
-
   currentAudio.onended = () => {
-    playNextInQueue()  // play next chunk when this one finishes
+    playNextInQueue()
   }
-
   currentAudio.play()
 }
 
@@ -104,6 +306,12 @@ function speak(text, rate = currentRate) {
 }
 
 function pauseSpeech() {
+  // Seekable player takes priority
+  if (audioElements.length > 0) {
+    playerTogglePause()
+    return
+  }
+  // Legacy fallback
   if (currentAudio && !currentAudio.paused) {
     currentAudio.pause()
     return
@@ -120,18 +328,17 @@ function pauseSpeech() {
 }
 
 function stopSpeech() {
-  audioQueue = []  // clear queue so next chunk doesn't auto-play
+  // Seekable player
+  if (audioElements.length > 0) {
+    destroyPlayer()
+  }
+  // Legacy queue
+  audioQueue = []
   if (currentAudio) {
     currentAudio.pause()
     currentAudio.currentTime = 0
     currentAudio = null
   }
-  if (speakTimer) {
-    clearTimeout(speakTimer)
-    speakTimer = null
-  }
-  window.speechSynthesis.cancel()
-  // fallback: Cancel any pending delayed speak() call so Stop is reliable
   if (speakTimer) {
     clearTimeout(speakTimer)
     speakTimer = null
@@ -176,24 +383,46 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ text: selected });
   }
 
-  // ── SPEECH COMMANDS (forwarded here from background.js) ──
+  // ── SEEKABLE AUDIO PLAYER (primary path from Polly) ──
   if (message.type === "PLAY_AUDIO_QUEUE") {
-    audioQueue = [...message.urls]  // load all chunks into queue
-    if (currentAudio) {
-      currentAudio.pause()
-      currentAudio = null
-    }
-    playNextInQueue()  // start playing
-    sendResponse({ ok: true })
+    stopSpeech()  // stop anything currently playing
+    loadAudioChunks(message.urls).then(() => {
+      playerPlay()
+      sendResponse({ ok: true, totalDuration })
+    }).catch(err => {
+      console.error("Failed to load audio chunks:", err)
+      sendResponse({ ok: false, error: err.message })
+    })
+    return true  // async response
   }
-  if (message.type === "PLAY_AUDIO_URL"){
-    audioQueue = [message.url]
-    if (currentAudio) {
-      currentAudio.pause()
-      currentAudio = null
-    }
-    playNextInQueue()
-    sendResponse({ ok: true })
+
+  if (message.type === "PLAY_AUDIO_URL") {
+    stopSpeech()
+    loadAudioChunks([message.url]).then(() => {
+      playerPlay()
+      sendResponse({ ok: true, totalDuration })
+    }).catch(err => {
+      sendResponse({ ok: false, error: err.message })
+    })
+    return true
+  }
+
+  // ── SEEK: jump to a specific time in seconds ──
+  if (message.type === "SEEK_AUDIO") {
+    playerSeekTo(message.time)
+    sendResponse({ ok: true, currentTime: getPlayerCurrentTime() })
+  }
+
+  // ── GET_PLAYBACK_STATE: popup requests current state on open ──
+  if (message.type === "GET_PLAYBACK_STATE") {
+    sendResponse({
+      currentTime: getPlayerCurrentTime(),
+      totalDuration: totalDuration,
+      isPlaying: playerIsPlaying,
+      isPaused: playerIsPaused,
+      chunkIndex: currentChunkIndex,
+      totalChunks: audioElements.length
+    })
   }
 
   //OLD COMMANDS (FALLBACK WHEN POLLY FAILS)
@@ -217,15 +446,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "SET_SPEED") {
     currentRate = message.rate
 
+    // Seekable player: update the currently playing chunk's rate
+    if (audioElements[currentChunkIndex]) {
+      audioElements[currentChunkIndex].playbackRate = currentRate
+    }
+
+    // Legacy fallback
     if (currentAudio) {
       currentAudio.playbackRate = currentRate
     }
 
-    // fallback: If speech is active, restart it at the new speed
-    // if (window.speechSynthesis.speaking) {
-    //   const remaining = lastUtteranceText
-    //   if (remaining) speak(remaining, currentRate)
-    // }
     sendResponse({ ok: true })
   }
 

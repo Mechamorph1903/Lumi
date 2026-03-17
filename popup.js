@@ -1,5 +1,5 @@
 // popup.js
-// This file controls everything you see in the popup panel. test
+// This file controls everything you see in the popup panel.
 // Its three jobs:
 //   1. Listen for button clicks from popup.html
 //   2. Ask content.js for text from the current webpage
@@ -16,15 +16,18 @@
 const btnSummarizePage  = document.getElementById("btn-summarize-page")
 const btnReadSelection  = document.getElementById("btn-read-selection")
 const userPrompt        = document.getElementById("user-prompt")
-const btnPause          = document.getElementById("btn-pause")
-const btnStop           = document.getElementById("btn-stop")
+const btnPlayPause      = document.getElementById("btn-play-pause")
+const btnRewind         = document.getElementById("btn-rewind")
+const btnFastFwd        = document.getElementById("btn-fastfwd")
 const speedSlider       = document.getElementById("speed-slider")
 const languageSelect    = document.getElementById("language-select")
 const statusText        = document.getElementById("status-text")
-const summaryBox        = document.getElementById("summary-box")
 const summaryText       = document.getElementById("summary-text")
 const summaryContainer  = document.getElementById("summary-container")
 const toggleSummaryBtn  = document.getElementById("toggle-summary")
+const progressBar       = document.getElementById("progress-bar")
+const timeCurrent       = document.getElementById("time-current")
+const timeTotal         = document.getElementById("time-total")
 
 //language last used
 chrome.storage.local.get("lumiLanguage", (result) => {
@@ -42,9 +45,9 @@ languageSelect.addEventListener("change", () => {
 chrome.storage.local.get("lumiSummary", (result) => {
   if (result.lumiSummary) {
     summaryText.textContent = result.lumiSummary
+    summaryContainer.classList.remove("hidden")
+    toggleSummaryBtn.textContent = "Hide Summary"
   }
-  summaryContainer.classList.remove("hidden")
-  toggleSummaryBtn.textContent = "Hide Summary"
 })
 
 //input last entered
@@ -58,7 +61,87 @@ userPrompt.addEventListener("focusout", () => {
   chrome.storage.local.set({ lumiInput: userPrompt.value })
 })
 
-//toggle go summary text
+const SKIP_SECONDS = 10  // how many seconds to jump on rewind / fast-forward
+
+
+// ─── TIME FORMATTING HELPER ──────────────────────────────────────────────────
+
+function formatTime(seconds) {
+  const s = Math.max(0, Math.floor(seconds))
+  const m = Math.floor(s / 60)
+  const sec = s % 60
+  return m + ":" + String(sec).padStart(2, "0")
+}
+
+
+// ─── PROGRESS BAR ────────────────────────────────────────────────────────────
+// Track whether the user is actively dragging the bar so we don't fight with
+// incoming progress updates.
+
+let isSeeking = false
+let lastTotalDuration = 0
+
+progressBar.addEventListener("mousedown", () => { isSeeking = true })
+progressBar.addEventListener("touchstart", () => { isSeeking = true })
+
+progressBar.addEventListener("change", () => {
+  isSeeking = false
+  if (lastTotalDuration <= 0) return
+  const seekTime = (progressBar.value / 100) * lastTotalDuration
+  chrome.runtime.sendMessage({ type: "SEEK_AUDIO", time: seekTime })
+})
+
+// Also update on input for real-time visual feedback while dragging
+progressBar.addEventListener("input", () => {
+  if (lastTotalDuration <= 0) return
+  const previewTime = (progressBar.value / 100) * lastTotalDuration
+  timeCurrent.textContent = formatTime(previewTime)
+})
+
+
+// ─── UPDATE UI FROM PLAYBACK STATE ──────────────────────────────────────────
+
+function updatePlaybackUI(state) {
+  if (!state) return
+  lastTotalDuration = state.totalDuration || 0
+
+  if (!isSeeking && lastTotalDuration > 0) {
+    progressBar.value = (state.currentTime / lastTotalDuration) * 100
+  }
+  timeCurrent.textContent = formatTime(state.currentTime || 0)
+  timeTotal.textContent   = formatTime(lastTotalDuration)
+
+  if (state.isPlaying) {
+    isPaused = false
+    btnPlayPause.textContent = "⏸"
+    btnPlayPause.dataset.state = "playing"
+  } else if (state.isPaused) {
+    isPaused = true
+    btnPlayPause.textContent = "▶"
+    btnPlayPause.dataset.state = "paused"
+  }
+}
+
+
+// ─── LISTEN FOR PROGRESS BROADCASTS FROM CONTENT.JS ─────────────────────────
+
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.type === "PLAYBACK_PROGRESS") {
+    updatePlaybackUI(message)
+  }
+})
+
+
+// ─── SYNC STATE WHEN POPUP OPENS ─────────────────────────────────────────────
+
+chrome.runtime.sendMessage({ type: "GET_PLAYBACK_STATE" }, (state) => {
+  if (chrome.runtime.lastError) return
+  updatePlaybackUI(state)
+})
+
+
+// ─── TOGGLE SUMMARY TEXT ─────────────────────────────────────────────────────
+
 toggleSummaryBtn.addEventListener("click", () => {
   summaryContainer.classList.toggle("hidden")
 
@@ -70,7 +153,6 @@ toggleSummaryBtn.addEventListener("click", () => {
 
 
 // ─── HELPER: UPDATE STATUS MESSAGE ───────────────────────────────────────────
-// Call this whenever the state changes so the user knows what's happening
 
 function setStatus(message) {
   statusText.textContent = message
@@ -78,11 +160,11 @@ function setStatus(message) {
 
 function showSummary(text) {
   summaryText.textContent = text
-  summaryBox.hidden = false
+  summaryContainer.classList.remove("hidden")
 }
 
 
-// ─── HELPER: ENSURE CONTENT SCRIPT IS INJECTED ─────────────────────────────
+// ─── HELPER: ENSURE CONTENT SCRIPT IS INJECTED ───────────────────────────────
 // Tabs open before the extension loaded won't have content.js.
 // Programmatically inject it so messaging doesn't fail.
 
@@ -97,7 +179,9 @@ async function ensureContentScript(tabId) {
   }
 }
 
-//Promise Helper Functions
+
+// ─── PROMISE HELPER FUNCTIONS ─────────────────────────────────────────────────
+
 const getPageText = (id) => {
   return new Promise((resolve) => {
     chrome.tabs.sendMessage(
@@ -137,7 +221,7 @@ const getSummaryFromBackground = (summaryText, userPrompt, mode) => {
         text: summaryText,
         prompt: userPrompt,
         mode: mode,
-        language: languageSelect.value  // ← language travels with every request
+        language: languageSelect.value
       },
       (response) => {
         console.log("got summary: " + response.summary)
@@ -150,11 +234,6 @@ const getSummaryFromBackground = (summaryText, userPrompt, mode) => {
 
 
 // ─── BUTTON: SUMMARIZE FULL PAGE ─────────────────────────────────────────────
-// When clicked:
-//   1. Tell content.js to grab all the text on the current page
-//   2. Send that text to background.js to call Claude
-//   3. Get the summary back
-//   4. Pass the summary to speak()
 
 btnSummarizePage.addEventListener("click", async () => {
   setStatus("Reading page...")
@@ -198,6 +277,9 @@ btnSummarizePage.addEventListener("click", async () => {
     chrome.storage.local.set({ lumiSummary: summary })
 
 
+    // Reset play/pause button to playing state whenever new speech starts
+    resetToPlayingState()
+
     chrome.runtime.sendMessage({
       type: "PLAY_SPEECH",
       text: summary,
@@ -212,14 +294,6 @@ btnSummarizePage.addEventListener("click", async () => {
 
 
 // ─── BUTTON: READ MY SELECTION ────────────────────────────────────────────────
-// When clicked:
-//   1. Tell content.js to grab only the text the user has highlighted
-//   2. Send that text to background.js to call Claude
-//   3. Get the summary back
-//   4. Pass the summary to speak()
-
-// Flow is identical to Summarize Page,
-// except content.js returns only highlighted text.
 
 btnReadSelection.addEventListener("click", async () => {
   setStatus("Reading selection...")
@@ -262,6 +336,9 @@ btnReadSelection.addEventListener("click", async () => {
     setStatus("Reading summary...")
     chrome.storage.local.set({ lumiSummary: summary })
 
+    // Reset play/pause button to playing state whenever new speech starts
+    resetToPlayingState()
+
     chrome.runtime.sendMessage({
       type: "PLAY_SPEECH",
       text: summary,
@@ -275,33 +352,57 @@ btnReadSelection.addEventListener("click", async () => {
 })
 
 
-// ─── BUTTON: PAUSE / RESUME ───────────────────────────────────────────────────
-// Sends PAUSE_SPEECH to background.js, which forwards to content.js.
-// content.js toggles pause/resume based on current speechSynthesis state.
+// ─── BUTTON: PLAY / PAUSE ─────────────────────────────────────────────────────
+// Toggles between pausing and resuming speech.
+// Visual state is tracked via data-state attribute on the button.
 
-btnPause.addEventListener("click", () => {
-  const isPaused = btnPause.textContent.trim() === "Resume"
+let isPaused = false
+
+function resetToPlayingState() {
+  isPaused = false
+  btnPlayPause.textContent = "⏸"
+  btnPlayPause.dataset.state = "playing"
+}
+
+btnPlayPause.addEventListener("click", () => {
+  isPaused = !isPaused
 
   if (isPaused) {
-    btnPause.textContent = "Pause"
-    setStatus("Resuming...")
-  } else {
-    btnPause.textContent = "Resume"
+    btnPlayPause.textContent = "▶"
+    btnPlayPause.dataset.state = "paused"
     setStatus("Paused.")
+  } else {
+    btnPlayPause.textContent = "⏸"
+    btnPlayPause.dataset.state = "playing"
+    setStatus("Resuming...")
   }
 
   chrome.runtime.sendMessage({ type: "PAUSE_SPEECH" })
 })
 
 
-// ─── BUTTON: STOP ────────────────────────────────────────────────────────────
-// Stop reading entirely and reset
+// ─── BUTTON: REWIND 10 SECONDS ────────────────────────────────────────────────
+// Tells background.js to jump back SKIP_SECONDS in the current speech.
+// background.js handles the actual seek logic using char-position estimation.
 
-btnStop.addEventListener("click", () => {
-  btnPause.textContent = "Pause"
-  setStatus("Stopped.")
+btnRewind.addEventListener("click", () => {
+  setStatus("Rewinding " + SKIP_SECONDS + "s...")
+  chrome.runtime.sendMessage({ type: "GET_PLAYBACK_STATE" }, (state) => {
+    const newTime = Math.max(0, (state?.currentTime || 0) - SKIP_SECONDS)
+    chrome.runtime.sendMessage({ type: "SEEK_AUDIO", time: newTime })
+  })
+})
 
-  chrome.runtime.sendMessage({ type: "STOP_SPEECH" })
+
+// ─── BUTTON: FAST FORWARD 10 SECONDS ─────────────────────────────────────────
+// Tells background.js to jump forward SKIP_SECONDS in the current speech.
+
+btnFastFwd.addEventListener("click", () => {
+  setStatus("Skipping " + SKIP_SECONDS + "s...")
+  chrome.runtime.sendMessage({ type: "GET_PLAYBACK_STATE" }, (state) => {
+    const newTime = (state?.currentTime || 0) + SKIP_SECONDS
+    chrome.runtime.sendMessage({ type: "SEEK_AUDIO", time: newTime })
+  })
 })
 
 
@@ -331,5 +432,4 @@ speedSlider.addEventListener("input", () => {
 // You'll see that pattern in background.js and content.js
 
 
-//test
 console.log("popup loaded")

@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la /d/Impact-a-thon/humane-glmg/*.md /d/Impact-a-thon/humane-glmg/*.txt)",
+      "Bash(git add README.md background.js content.js manifest.json popup.css popup.html popup.js)",
+      "Bash(git commit:*)",
+      "Bash(git add content.js)",
+      "Bash(git push -u origin firefox-compat)",
+      "Bash(gh pr:*)",
+      "Bash(where gh)",
+      "Bash(git add manifest.json content.js popup.js)",
+      "Bash(git push)",
+      "Bash(git add background.js content.js popup.html)",
+      "Bash(git add README.md background.js)",
+      "Bash(git pull --rebase origin firefox-compat)",
+      "Bash(git add manifest.json background.js)",
+      "Bash(git add background.js manifest.json .gitignore README.md)"
+    ]
+  }
+}
