@@ -70,4 +70,4 @@ If you'd like to build on top of Lumi, feel free to fork the repo.
 
 ---
 
-<p align="center">Made with purpose · Honeywell NSBE AI Impact-A-Thon 2026</p>
+<p align="center">Made with purpose · GLMLG Legion · Honeywell NSBE AI Impact-A-Thon 2026</p>
