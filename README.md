@@ -1,134 +1,73 @@
-# AccessAI — AI-Powered Screen Reader
+# Lumi 🌟
+### AI-Powered Screen Reader Chrome Extension
 
-An AI-powered browser extension that summarizes webpage content and reads it aloud. Built for the Honeywell Hackathon at NSBE 26.
+> Built for the NSBE AI Impact-A-Thon · Archived
 
----
-
-## What It Does
-
-AccessAI is a browser extension (Chrome + Firefox) that makes web content more accessible by:
-
-- **Summarizing full pages** — extracts all visible text and generates a concise 3–5 sentence summary using Claude AI
-- **Summarizing selections** — highlight any text on a page and summarize just that
-- **Floating "Read This" button** — appears automatically when you highlight text for quick one-click access
-- **Text-to-speech playback** — reads summaries aloud with pause, stop, and speed controls
+Lumi is an intelligent screen reader Chrome extension that makes web content accessible to everyone. Powered by Claude AI and AWS Polly neural voices, Lumi reads web pages aloud with natural-sounding speech — supporting multiple languages and adjustable communication styles to fit each user's needs.
 
 ---
 
-## Prerequisites
+## Features
 
-- Google Chrome or Mozilla Firefox
-- An [Anthropic API key](https://console.anthropic.com/)
-
----
-
-## Setup
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/Mechamorph1903/humane-glmg.git
-cd humane-glmg
-```
-
-### 2. Create your config file
-
-Create a file named `config.json` in the project root with your Anthropic API key:
-
-```json
-{
-  "apiKey": "sk-ant-your-api-key-here"
-}
-```
-
-> **Note:** `config.json` is gitignored and must be created manually. Never commit your API key.
-
-### 3. Load the extension
-
-**Chrome:**
-1. Open `chrome://extensions/`
-2. Toggle on **Developer mode** (top-right corner)
-3. Click **Load unpacked**
-4. Select the `humane-glmg` project folder
-
-**Firefox:**
-1. Open `about:debugging#/runtime/this-firefox`
-2. Click **Load Temporary Add-on...**
-3. Select `manifest.json` from the project folder
-
----
-
-## Usage
-
-### Summarize a full page
-
-1. Navigate to any webpage
-2. Click the AccessAI extension icon in your toolbar
-3. Click **Summarize Page**
-4. The extension will read a summary of the entire page aloud
-
-### Summarize a selection
-
-1. Highlight any text on a webpage
-2. Either:
-   - Click the floating **Read This** button that appears near your selection, or
-   - Open the extension popup and click **Read My Selection**
-3. A summary of the selected text will be read aloud
-
-### Playback controls
-
-Use the controls in the extension popup to:
-
-| Control | Action |
-|---------|--------|
-| Pause / Resume | Pause or continue speech |
-| Stop | Stop playback entirely |
-| Speed slider | Adjust reading speed |
-
----
-
-## Project Structure
-
-```
-humane-glmg/
-├── manifest.json     # Extension config (Manifest V3, Chrome + Firefox)
-├── background.js     # Service worker — calls Claude API, forwards speech commands
-├── content.js        # Injected into pages — extracts text, runs TTS, floating button
-├── popup.html        # Extension popup UI
-├── popup.js          # Popup event handlers and message coordination
-├── popup.css         # Dark-theme styling
-└── config.js         # (you create this) API key — gitignored
-```
-
----
-
-## How It Works
-
-1. User triggers an action in the popup or via the floating button
-2. `popup.js` sends a message to `content.js` to extract page or selection text
-3. `popup.js` forwards the text to `background.js`
-4. `background.js` calls the Anthropic Claude API (`claude-haiku-4-5-20251001`) to generate a summary
-5. `background.js` forwards the summary to `content.js`
-6. `content.js` reads it aloud using the browser's Web Speech API (service workers can't access `speechSynthesis`)
-
----
-
-## Permissions
-
-The extension requires the following permissions:
-
-| Permission | Reason |
-|------------|--------|
-| `activeTab` | Access text content of the current tab |
-| `scripting` | Inject content scripts into pages |
-| `storage` | Store local settings |
+- **AI-Powered Reading** — Uses Claude Haiku to intelligently process and summarize web content before reading, not just raw text dumps
+- **Neural Text-to-Speech** — AWS Polly neural voices deliver natural, human-like audio across multiple languages
+- **Multilingual Support** — Reads and speaks content in multiple languages, automatically adapting to page content
+- **Custom Communication Registers** — Users can adjust speech style (formal, conversational, simplified) to match their comprehension preferences
+- **Seamless Browser Integration** — Built on Chrome Manifest V3 for performance, security, and compatibility with modern Chrome APIs
 
 ---
 
 ## Tech Stack
 
-- Vanilla JavaScript (no build step required)
-- Extensions Manifest V3 (Chrome + Firefox)
-- Anthropic Claude API (`claude-haiku-4-5-20251001`)
-- AWS Polly (naturalistic converstaional TTS API)
-- Web Speech API (browser-native text-to-speech)
+| Layer | Technology |
+|---|---|
+| Extension Architecture | Chrome Manifest V3 |
+| AI / NLP | Anthropic Claude Haiku API |
+| Text-to-Speech | AWS Polly (Neural Engine) |
+| AWS Auth | Signature V4 |
+| Language | JavaScript |
+
+### Architecture Overview
+
+Lumi follows a service-worker architecture required by Manifest V3:
+
+1. **Content Script** — Extracts and cleans page text from the active tab
+2. **Service Worker (Background)** — Orchestrates API calls; sends text to Claude Haiku for processing, then forwards the result to AWS Polly
+3. **Popup UI** — Controls for language selection, communication register, and playback
+4. **AWS Polly** — Returns audio stream, authenticated via AWS Signature V4
+
+---
+
+## Team
+
+This project was built as a hackathon submission for the **NSBE AI Impact-A-Thon**.
+
+| Name | Role |
+|---|---|
+| Daniel | Lead Developer & Prompt Engineer (Claude & AWS Polly Integration) |
+| Gabe | Backend Developer (Speech & Playback) |
+| Marius | Front-end Developer (Main UI) |
+| Adeboye | Front-end Developer (Main UI) |
+| Michael | Front-end Developer (Playback)  |
+| Ezra | Presenter & Project Coordinator |
+
+
+---
+
+## Status
+
+This repository is **archived** (*Daniel: For now). Lumi was built as a hackathon project and is not actively maintained. The codebase is available for reference, learning, and forking.
+
+If you'd like to build on top of Lumi, feel free to fork the repo.
+
+---
+
+## Acknowledgements
+
+- [Anthropic](https://www.anthropic.com) — Claude Haiku API
+- [AWS Polly](https://aws.amazon.com/polly/) — Neural text-to-speech
+- Honeywell NSBE AI Impact-A-Thon organizers and mentors
+
+---
+
+<p align="center">Made with purpose · Honeywell NSBE AI Impact-A-Thon 2026</p>
